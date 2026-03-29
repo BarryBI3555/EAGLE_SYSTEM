@@ -23,7 +23,7 @@ export const dashboardRoutes: AppRouteRecord = {
     {
       path: 'personnel',
       name: 'Personnel',
-      component: '/dashboard/console',
+      component: '/dashboard/personnel',
       meta: {
         title: 'menus.dashboard.personnel',
         keepAlive: false
@@ -32,7 +32,7 @@ export const dashboardRoutes: AppRouteRecord = {
     {
       path: 'cases',
       name: 'Cases',
-      component: '/dashboard/console',
+      component: '/dashboard/cases',
       meta: {
         title: 'menus.dashboard.cases',
         keepAlive: false
@@ -41,7 +41,7 @@ export const dashboardRoutes: AppRouteRecord = {
     {
       path: 'category',
       name: 'Category',
-      component: '/dashboard/console',
+      component: '/dashboard/category',
       meta: {
         title: 'menus.dashboard.category',
         keepAlive: false
