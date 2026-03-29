@@ -1,4 +1,4 @@
-<!-- 人员路线地图组件 -->
+<!-- 人员路线地图组件（可用版 qq.maps） -->
 <template>
   <div class="user-map-container">
     <div id="map-container" class="map-container"></div>
@@ -8,153 +8,121 @@
 </template>
 
 <script setup lang="ts">
-  import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
-  declare global {
-    interface Window {
-      T: any
+declare global {
+  interface Window {
+    qq: any
+  }
+}
+
+const map = ref<any>(null)
+const markers = ref<any[]>([])
+const polyline = ref<any>(null)
+const loading = ref(true)
+const error = ref('')
+
+// 初始化地图
+const initMap = async () => {
+  try {
+    if (!window.qq || !window.qq.maps) {
+      throw new Error("地图SDK加载失败")
     }
-  }
 
-  const map = ref<any>(null)
-  const markers = ref<any[]>([])
-  const polyline = ref<any>(null)
-  const loading = ref(true)
-  const error = ref('')
-
-  // 检查腾讯地图 API 是否已加载
-  const checkTencentMapLoaded = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      const checkInterval = setInterval(() => {
-        if (window.T && window.T.Map) {
-          clearInterval(checkInterval)
-          resolve()
-        }
-      }, 100)
-
-      // 5秒超时
-      setTimeout(() => {
-        clearInterval(checkInterval)
-        reject(new Error('腾讯地图 API 加载超时'))
-      }, 5000)
+    // 成都中心
+    const center = new window.qq.maps.LatLng(30.6799, 104.0571)
+    
+    map.value = new window.qq.maps.Map(document.getElementById("map-container"), {
+      center: center,
+      zoom: 12,
+      draggable: true,
+      scrollwheel: true
     })
+
+    await fetchUserLocations()
+    loading.value = false
+  } catch (err: unknown) {
+    console.error('地图初始化失败', err)
+    error.value = '地图加载失败'
+    loading.value = false
   }
+}
 
-  // 初始化地图
-  const initMap = async () => {
-    try {
-      // 检查腾讯地图 API 是否已加载
-      await checkTencentMapLoaded()
+// 获取后端数据并绘制路线 + 点
+const fetchUserLocations = async () => {
+  try {
+    const res = await fetch('http://localhost:8080/api/locations')
+    const data = await res.json()
+    console.log('获取数据:', data)
 
-      // 初始化地图
-      map.value = new window.T.Map('map-container', {
-        center: new window.T.LngLat(104.0657, 30.6574),
-        zoom: 13,
-        displayOptions: {
-          toolbar: true,
-          scale: true
-        }
+    clearOverlays()
+    if (!data || data.length === 0) return
+
+    // 构造坐标点
+    const path = data.map((item: any) => 
+      new window.qq.maps.LatLng(item.latitude, item.longitude)
+    )
+
+    // 绘制路线
+    const line = new window.qq.maps.Polyline({
+      map: map.value,
+      path: path,
+      strokeColor: '#FF4E4F',
+      strokeWeight: 4
+    })
+    polyline.value = line
+
+    // 绘制点 + 弹窗
+    data.forEach((item: any) => {
+      const pos = new window.qq.maps.LatLng(item.latitude, item.longitude)
+      const marker = new window.qq.maps.Marker({
+        position: pos,
+        map: map.value
+      })
+      markers.value.push(marker)
+
+      // 点击弹窗
+      const info = new window.qq.maps.InfoWindow({
+        content: `
+          <div style="padding:8px;">
+            用户：${item.usercode}<br>
+            时间：${item.createTime}<br>
+            经纬度：${item.latitude}, ${item.longitude}
+          </div>
+        `
       })
 
-      // 获取人员位置数据
-      await fetchUserLocations()
-      loading.value = false
-    } catch (err) {
-      console.error('地图初始化失败:', err)
-      error.value = '地图加载失败，请检查网络连接或腾讯地图 API 密钥配置'
-      loading.value = false
-    }
-  }
-
-  // 获取人员位置数据
-  const fetchUserLocations = async () => {
-    try {
-      const response = await fetch('http://localhost:8080/api/locations')
-      const data = await response.json()
-      console.log('人员位置数据:', data)
-
-      // 清除旧的标记
-      clearMarkers()
-
-      // 如果有数据，绘制路线
-      if (data && data.length > 0) {
-        // 获取所有坐标点
-        const latlngs = data.map((item: any) => {
-          return new window.T.LngLat(item.longitude, item.latitude)
-        })
-
-        // 绘制折线
-        const polylineOptions = {
-          strokeColor: '#FF4E4F',
-          strokeWeight: 4,
-          strokeOpacity: 0.8
-        }
-        polyline.value = new window.T.Polyline(latlngs, polylineOptions)
-        map.value.addOverlay(polyline.value)
-
-        // 添加标记点
-        data.forEach((item: any, index: number) => {
-          const marker = new window.T.Marker(
-            new window.T.LngLat(item.longitude, item.latitude),
-            {
-              title: `用户: ${item.usercode}\n时间: ${item.createTime}`
-            }
-          )
-          markers.value.push(marker)
-          map.value.addOverlay(marker)
-
-          // 点击标记显示信息窗口
-          window.T.Event.addListener(marker, 'click', () => {
-            const content = document.createElement('div')
-            content.innerHTML = `<div style="padding:10px;">
-              <strong>用户编码:</strong> ${item.usercode}<br>
-              <strong>创建时间:</strong> ${item.createTime}<br>
-              <strong>纬度:</strong> ${item.latitude}<br>
-              <strong>经度:</strong> ${item.longitude}
-            </div>`
-            
-            const infoWindow = new window.T.InfoWindow(content, {
-              position: new window.T.LngLat(item.longitude, item.latitude)
-            })
-            map.value.openInfoWindow(infoWindow)
-          })
-        })
-
-        // 自动调整地图视野
-        if (latlngs.length > 0) {
-          map.value.setFitView()
-        }
-      }
-    } catch (err) {
-      console.error('获取位置数据失败:', err)
-      error.value = '获取位置数据失败，请检查后端服务是否正常'
-      loading.value = false
-    }
-  }
-
-  // 清除所有标记
-  const clearMarkers = () => {
-    markers.value.forEach((marker) => {
-      map.value.removeOverlay(marker)
+      window.qq.maps.event.addListener(marker, 'click', () => {
+        info.open(map.value, marker)
+      })
     })
-    markers.value = []
-    if (polyline.value) {
-      map.value.removeOverlay(polyline.value)
-      polyline.value = null
-    }
+
+    // 自适应视野
+    map.value.fitBounds(new window.qq.maps.LatLngBounds(path[0], path[path.length - 1]))
+  } catch (e) {
+    console.error('获取数据失败', e)
+    error.value = '后端接口异常'
   }
+}
 
-  onMounted(() => {
-    initMap()
-  })
+// 清理覆盖物
+const clearOverlays = () => {
+  if (map.value) {
+    markers.value.forEach(m => m.setMap(null))
+    if (polyline.value) polyline.value.setMap(null)
+  }
+  markers.value = []
+  polyline.value = null
+}
 
-  onUnmounted(() => {
-    // 清理资源
-    clearMarkers()
-    if (map.value) {
-      map.value.dispose()
-    }
-  })
+onMounted(() => {
+  initMap()
+})
+
+onUnmounted(() => {
+  clearOverlays()
+  map.value = null
+})
 </script>
 
 <style scoped>
@@ -163,28 +131,17 @@
   height: 100%;
   position: relative;
 }
-
 .map-container {
   width: 100%;
   height: 500px;
 }
-
-.loading {
+.loading, .error {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 16px;
-  color: #666;
 }
-
 .error {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 16px;
   color: #f56c6c;
-  text-align: center;
 }
 </style>
