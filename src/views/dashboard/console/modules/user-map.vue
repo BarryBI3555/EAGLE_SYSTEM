@@ -8,23 +8,43 @@
     </div>
     <div class="user-list">
       <h3 class="user-list-title">人员列表</h3>
+
+      <!-- 时间选择器 -->
+      <div class="time-filter">
+        <el-date-picker
+          v-model="selectedDate"
+          type="date"
+          placeholder="选择日期"
+          format="YYYY-MM-DD"
+          value-format="YYYY-MM-DD"
+          style="width: 100%; margin-bottom: 12px"
+          class="time-picker"
+        />
+        <el-button type="primary" @click="filterUsers" style="width: 100%">
+          筛选
+        </el-button>
+      </div>
+
       <div v-if="loading" class="user-list-loading">加载中...</div>
       <div v-else-if="userList.length === 0" class="user-list-empty">暂无人员数据</div>
       <div
         v-for="user in userList"
         :key="user.usercode"
         class="user-card"
-        :class="{ 'active': selectedUser === user.usercode }"
+        :class="{ active: selectedUser === user.usercode }"
         @click="showUserHistory(user.usercode)"
       >
         <div class="user-card-header">
-          <span class="user-code">{{ user.usercode }}</span>
+          <span class="user-code">{{ user.username || user.usercode }}</span>
           <span class="user-time">{{ formatTime(user.createTime) }}</span>
         </div>
         <div class="user-card-body">
           <div class="user-location">
-            <span class="label">当前位置:</span>
-            <span class="value">{{ user.latitude.toFixed(4) }}, {{ user.longitude.toFixed(4) }}</span>
+            <span class="label">经纬度:</span>
+            <span class="value">{{ `${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}` }}</span>
+          </div>
+          <div class="user-info" v-if="user.ckl || user.dsl">
+            <span>查勘量: {{ user.ckl || '-' }} | 定损量: {{ user.dsl || '-' }}</span>
           </div>
         </div>
       </div>
@@ -33,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 declare global {
   interface Window {
@@ -48,6 +68,16 @@ const loading = ref(true)
 const error = ref('')
 const userList = ref<any[]>([])
 const selectedUser = ref<string>('')
+
+// 默认日期：今天
+const today = new Date()
+const formatDate = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+const selectedDate = ref<string | null>(formatDate(today))
 
 // 格式化时间
 const formatTime = (timeString: string) => {
@@ -66,14 +96,12 @@ const formatTime = (timeString: string) => {
 const initMap = async () => {
   try {
     if (!window.qq || !window.qq.maps) {
-      throw new Error("地图SDK加载失败")
+      throw new Error('地图SDK加载失败')
     }
 
-    // 成都中心
     const center = new window.qq.maps.LatLng(30.6799, 104.0571)
-    
-    map.value = new window.qq.maps.Map(document.getElementById("map-container"), {
-      center: center,
+    map.value = new window.qq.maps.Map(document.getElementById('map-container'), {
+      center,
       zoom: 12,
       draggable: true,
       scrollwheel: true
@@ -88,12 +116,15 @@ const initMap = async () => {
   }
 }
 
-// 获取每个用户最新的位置
-const fetchLatestLocations = async () => {
+// 获取【指定日期】所有用户最新位置
+const fetchLatestLocations = async (date?: string) => {
   try {
-    const res = await fetch('http://localhost:8080/api/locations/latest')
+    let url = 'http://localhost:8080/api/locations/latest'
+    if (date) url += `?date=${date}`
+
+    const res = await fetch(url)
     const data = await res.json()
-    console.log('获取数据:', data)
+    console.log('最新人员数据：', data)
 
     clearOverlays()
     if (!data || data.length === 0) {
@@ -101,20 +132,10 @@ const fetchLatestLocations = async () => {
       return
     }
 
-    // 按usercode分组并获取最新记录
-    const userGroups: any = {}
-    data.forEach((item: any) => {
-      if (!userGroups[item.usercode] || 
-          new Date(item.createTime).getTime() > new Date(userGroups[item.usercode].createTime).getTime()) {
-        userGroups[item.usercode] = item
-      }
-    })
+    userList.value = data
 
-    // 转换为数组
-    userList.value = Object.values(userGroups)
-
-    // 在地图上显示最新位置
-    userList.value.forEach((user: any) => {
+    // 绘制标记
+    userList.value.forEach((user) => {
       const pos = new window.qq.maps.LatLng(user.latitude, user.longitude)
       const marker = new window.qq.maps.Marker({
         position: pos,
@@ -123,13 +144,14 @@ const fetchLatestLocations = async () => {
       })
       markers.value.push(marker)
 
-      // 点击标记显示信息窗口
+      // 信息窗口
       const info = new window.qq.maps.InfoWindow({
         content: `
           <div style="padding:8px;">
-            <strong>用户：</strong>${user.usercode}<br>
+            <strong>用户：</strong>${user.username || user.usercode}<br>
             <strong>时间：</strong>${formatTime(user.createTime)}<br>
-            <strong>经纬度：</strong>${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}
+            <strong>经纬度：</strong>${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}<br>
+            <strong>CKL：</strong>${user.ckl || '-'} | <strong>DSL：</strong>${user.dsl || '-'}
           </div>
         `
       })
@@ -140,102 +162,79 @@ const fetchLatestLocations = async () => {
     })
 
     // 自适应视野
-    if (markers.value.length > 0) {
+    if (markers.value.length) {
       const bounds = new window.qq.maps.LatLngBounds()
-      markers.value.forEach(marker => {
-        bounds.extend(marker.getPosition())
-      })
+      markers.value.forEach((m) => bounds.extend(m.getPosition()))
       map.value.fitBounds(bounds)
     }
   } catch (e) {
-    console.error('获取数据失败', e)
+    console.error('获取人员数据失败', e)
     error.value = '后端接口异常'
   }
 }
 
-// 显示用户历史轨迹
+// 筛选按钮
+const filterUsers = async () => {
+  await fetchLatestLocations(selectedDate.value || undefined)
+}
+
+// 查看用户【当日】轨迹
 const showUserHistory = async (usercode: string) => {
   try {
     selectedUser.value = usercode
     clearOverlays()
 
-    // 获取用户历史数据
-    const res = await fetch(`http://localhost:8080/api/locations/user/${usercode}`)
+    let url = `http://localhost:8080/api/locations/user/${usercode}`
+    if (selectedDate.value) url += `?date=${selectedDate.value}`
+
+    const res = await fetch(url)
     const data = await res.json()
-    console.log(`获取${usercode}的历史数据:`, data)
+    console.log('用户轨迹：', data)
 
     if (!data || data.length === 0) {
-      error.value = '该用户暂无历史数据'
+      error.value = '该用户当日无轨迹数据'
       return
     }
 
-    // 按时间排序
-    data.sort((a: any, b: any) => {
-      return new Date(a.createTime).getTime() - new Date(b.createTime).getTime()
-    })
-
-    // 绘制轨迹
-    const path = data.map((item: any) => 
-      new window.qq.maps.LatLng(item.latitude, item.longitude)
-    )
-
+    // 绘制轨迹线
+    const path = data.map((item: any) => new window.qq.maps.LatLng(item.latitude, item.longitude))
     const line = new window.qq.maps.Polyline({
       map: map.value,
-      path: path,
+      path,
       strokeColor: '#409EFF',
       strokeWeight: 4,
       strokeOpacity: 0.8
     })
     polylines.value.push(line)
 
-    // 绘制标记点
+    // 绘制轨迹点
     data.forEach((item: any, index: number) => {
       const pos = new window.qq.maps.LatLng(item.latitude, item.longitude)
       const marker = new window.qq.maps.Marker({
         position: pos,
         map: map.value,
-        title: `${usercode} - 点 ${index + 1}`
+        title: `点 ${index + 1}`
       })
       markers.value.push(marker)
-
-      // 点击标记显示信息窗口
-      const info = new window.qq.maps.InfoWindow({
-        content: `
-          <div style="padding:8px;">
-            <strong>用户：</strong>${item.usercode}<br>
-            <strong>时间：</strong>${formatTime(item.createTime)}<br>
-            <strong>经纬度：</strong>${item.latitude.toFixed(4)}, ${item.longitude.toFixed(4)}<br>
-            <strong>点序号：</strong>${index + 1}/${data.length}
-          </div>
-        `
-      })
-
-      window.qq.maps.event.addListener(marker, 'click', () => {
-        info.open(map.value, marker)
-      })
     })
 
-    // 聚焦到用户轨迹
-    if (path.length > 0) {
-      const bounds = new window.qq.maps.LatLngBounds()
-      path.forEach((point: any) => {
-        bounds.extend(point)
-      })
-      map.value.fitBounds(bounds)
-    }
+    // 聚焦轨迹
+    const bounds = new window.qq.maps.LatLngBounds()
+    path.forEach((p: any) => bounds.extend(p))
+    map.value.fitBounds(bounds)
 
     error.value = ''
   } catch (e) {
-    console.error('获取历史数据失败', e)
-    error.value = '获取历史数据失败'
+    console.error('获取轨迹失败', e)
+    error.value = '获取轨迹失败'
   }
 }
 
-// 清理覆盖物
+// 清理地图覆盖物
 const clearOverlays = () => {
   if (map.value) {
-    markers.value.forEach(m => m.setMap(null))
-    polylines.value.forEach(p => p.setMap(null))
+    markers.value.forEach((m) => m.setMap(null))
+    polylines.value.forEach((p) => p.setMap(null))
   }
   markers.value = []
   polylines.value = []
@@ -285,6 +284,11 @@ onUnmounted(() => {
   color: #333;
 }
 
+.time-filter {
+  margin-bottom: 16px;
+  width: 100%;
+}
+
 .user-card {
   background-color: white;
   border: 1px solid #eaeaea;
@@ -324,11 +328,18 @@ onUnmounted(() => {
 
 .user-card-body {
   font-size: 14px;
+  line-height: 1.5;
 }
 
 .user-location {
   display: flex;
   justify-content: space-between;
+}
+
+.user-info {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
 }
 
 .user-location .label {
@@ -340,7 +351,10 @@ onUnmounted(() => {
   font-family: monospace;
 }
 
-.loading, .error, .user-list-loading, .user-list-empty {
+.loading,
+.error,
+.user-list-loading,
+.user-list-empty {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -352,7 +366,8 @@ onUnmounted(() => {
   color: #f56c6c;
 }
 
-.user-list-loading, .user-list-empty {
+.user-list-loading,
+.user-list-empty {
   position: relative;
   top: auto;
   left: auto;
@@ -365,7 +380,7 @@ onUnmounted(() => {
   .user-map-container {
     flex-direction: column;
   }
-  
+
   .user-list {
     width: 100%;
     height: 200px;
