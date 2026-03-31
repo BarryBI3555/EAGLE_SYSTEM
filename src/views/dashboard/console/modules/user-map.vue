@@ -6,44 +6,64 @@
       <div v-if="loading" class="loading">地图加载中...</div>
       <div v-if="error" class="error">{{ error }}</div>
     </div>
-    <div class="user-list">
-      <h3 class="user-list-title">人员列表</h3>
 
-      <div class="time-filter">
-        <el-date-picker
-          v-model="selectedDate"
-          type="date"
-          placeholder="选择日期"
-          format="YYYY-MM-DD"
-          value-format="YYYY-MM-DD"
-          style="width: 100%; margin-bottom: 12px"
-          class="time-picker"
-        />
-        <el-button type="primary" @click="filterUsers" style="width: 100%">
-          筛选
-        </el-button>
+    <div class="user-list">
+      <!-- 固定顶部区域 -->
+      <div class="user-list-fixed">
+        <div class="title-row">
+          <h3 class="user-list-title">人员列表</h3>
+          <img
+            src="@/assets/images/icon/Home.png"
+            class="home-img-btn"
+            @click="goToHomePage"
+            title="返回主页"
+          >
+        </div>
+
+        <div class="time-filter">
+          <el-date-picker
+            v-model="selectedDate"
+            type="date"
+            placeholder="选择日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            style="width: 100%; margin-bottom: 12px"
+          />
+          <el-button type="primary" @click="filterUsers" style="width: 100%">
+            筛选
+          </el-button>
+        </div>
       </div>
 
-      <div v-if="loading" class="user-list-loading">加载中...</div>
-      <div v-else-if="userList.length === 0" class="user-list-empty">暂无人员数据</div>
-      <div
-        v-for="user in userList"
-        :key="user.usercode"
-        class="user-card"
-        :class="{ active: selectedUser === user.usercode }"
-        @click="showUserHistory(user.usercode)"
-      >
-        <div class="user-card-header">
-          <span class="user-code">{{ user.username || user.usercode }}</span>
-          <span class="user-time">{{ formatTime(user.createTime) }}</span>
-        </div>
-        <div class="user-card-body">
-          <div class="user-location">
-            <span class="label">经纬度:</span>
-            <span class="value">{{ `${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}` }}</span>
+      <!-- 滚动列表 -->
+      <div class="user-list-scroll">
+        <div v-if="loading" class="user-list-loading">加载中...</div>
+        <div v-else-if="userList.length === 0" class="user-list-empty">暂无人员数据</div>
+
+        <div
+          v-for="user in userList"
+          :key="user.usercode"
+          class="user-card"
+          :class="{ active: selectedUser === user.usercode }"
+          @click="showUserHistory(user.usercode)"
+        >
+          <div class="user-card-header">
+            <span class="user-code">
+              {{ user.username || user.usercode }}
+              <span v-if="user.username && user.usercode" class="user-code-sub">
+                ({{ user.usercode }})
+              </span>
+            </span>
+            <span class="user-time">{{ formatTime(user.createTime) }}</span>
           </div>
-          <div class="user-info" v-if="user.ckl || user.dsl">
-            <span>查勘量: {{ user.ckl || '-' }} | 定损量: {{ user.dsl || '-' }}</span>
+          <div class="user-card-body">
+            <div class="user-location">
+              <span class="label">经纬度</span>
+              <span class="value">{{ `${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}` }}</span>
+            </div>
+            <div class="user-info" v-if="user.ckl || user.dsl">
+              查勘量: {{ user.ckl || '-' }} &nbsp;&nbsp;|&nbsp;&nbsp; 定损量: {{ user.dsl || '-' }}
+            </div>
           </div>
         </div>
       </div>
@@ -93,10 +113,8 @@ const formatTime = (timeString: string) => {
   })
 }
 
-
 let lastHeading = 0
 
-// 轨迹超平滑插值（路径更密，角度更稳）
 const interpolatePath = (path: any[], segmentCount = 120) => {
   let smoothPath: any[] = []
   for (let i = 0; i < path.length - 1; i++) {
@@ -112,13 +130,10 @@ const interpolatePath = (path: any[], segmentCount = 120) => {
   return smoothPath
 }
 
-// 计算航向 + 平滑角度（不跳变）
 const computeSmoothHeading = (from: any, to: any) => {
   const dy = to.lng - from.lng
   const dx = to.lat - from.lat
   let heading = Math.atan2(dy, dx) * 180 / Math.PI
-
-  // 【关键】角度不突变，缓慢过渡
   const diff = heading - lastHeading
   if (Math.abs(diff) > 180) {
     heading -= Math.sign(diff) * 360
@@ -174,7 +189,8 @@ const fetchLatestLocations = async (date?: string) => {
       const marker = new window.qq.maps.Marker({
         position: pos,
         map: map.value,
-        title: user.usercode
+        title: `${user.username || ''} (${user.usercode})`,
+        icon: 'src/assets/images/icon/Location.png' 
       })
       markers.value.push(marker)
 
@@ -209,20 +225,24 @@ const filterUsers = async () => {
   await fetchLatestLocations(selectedDate.value || undefined)
 }
 
+const goToHomePage = async () => {
+  selectedUser.value = ''
+  clearOverlays()
+  await fetchLatestLocations(selectedDate.value || undefined)
+}
+
 const showUserHistory = async (usercode: string) => {
   try {
     selectedUser.value = usercode
     clearOverlays()
-    lastHeading = 0 // 重置角度
+    lastHeading = 0
 
     let url = `http://localhost:8080/api/locations/user/${usercode}`
     if (selectedDate.value) url += `?date=${selectedDate.value}`
 
-    console.log('请求轨迹接口:', url)
     const res = await fetch(url)
     if (!res.ok) throw new Error(`HTTP错误: ${res.status}`)
     const data = await res.json()
-    console.log('用户轨迹数据:', data)
 
     if (!data || data.length === 0) {
       error.value = '该用户当日无轨迹数据'
@@ -237,7 +257,6 @@ const showUserHistory = async (usercode: string) => {
       new window.qq.maps.LatLng(item.latitude, item.longitude)
     )
 
-    // 轨迹
     const line = new window.qq.maps.Polyline({
       map: map.value,
       path: path,
@@ -247,7 +266,6 @@ const showUserHistory = async (usercode: string) => {
     })
     polylines.value.push(line)
 
-    // 起点终点
     const startPoint = path[0]
     const endPoint = path[path.length - 1]
 
@@ -279,7 +297,6 @@ const showUserHistory = async (usercode: string) => {
     })
     markers.value.push(endMarker)
 
-    // 小车
     playMarker.value = new window.qq.maps.Marker({
       position: path[0],
       map: map.value,
@@ -307,7 +324,6 @@ const showUserHistory = async (usercode: string) => {
   }
 }
 
-// 【无抖动核心】平滑移动 + 不跳变角度
 const startPlay = (path: any[]) => {
   if (playTimer.value) clearInterval(playTimer.value)
   const smoothPath = interpolatePath(path, 200)
@@ -358,16 +374,29 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* 日期选择器选中后文字变黑色 */
+:deep(.el-input__inner) {
+  color: #1d2129 !important;
+  --el-input-text-color: #1d2129 !important;
+}
+:deep(.el-input__inner::placeholder) {
+  color: #999 !important;
+}
+
 .user-map-container {
   display: flex;
   width: 100%;
   height: 100%;
   position: relative;
+  background: #f5f7fa;
 }
 
 .map-content {
   flex: 1;
   position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .map-container {
@@ -375,124 +404,186 @@ onBeforeUnmount(() => {
   height: 500px;
 }
 
+/* 右侧人员面板 */
 .user-list {
-  width: 300px;
+  width: 320px;
   height: 500px;
-  overflow-y: auto;
-  background-color: #f9f9f9;
-  border-left: 1px solid #eaeaea;
-  padding: 16px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 固定顶部区域 */
+.user-list-fixed {
+  flex-shrink: 0;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f2f5;
+  margin-bottom: 8px;
+}
+
+.title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
 .user-list-title {
-  font-size: 16px;
-  font-weight: bold;
-  margin-bottom: 16px;
-  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1d2129;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.home-img-btn {
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  opacity: 0.85;
+}
+.home-img-btn:hover {
+  opacity: 1;
+  transform: scale(1.08);
 }
 
 .time-filter {
-  margin-bottom: 16px;
-  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
+/* 滚动区域 —— 超细 + 透明 + 靠右 */
+.user-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-top: 12px;
+  padding-bottom: 4px;
+  padding-right: 0px !important;
+  margin-right: -8px;
+}
+.user-list-scroll::-webkit-scrollbar {
+  width: 2px !important;
+  height: 2px !important;
+}
+.user-list-scroll::-webkit-scrollbar-thumb {
+  background: rgba(150, 150, 150, 0.3) !important;
+  border-radius: 10px !important;
+  opacity: 0.4 !important;
+}
+.user-list-scroll::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+/* 人员卡片 */
 .user-card {
-  background-color: white;
-  border: 1px solid #eaeaea;
-  border-radius: 8px;
-  padding: 12px;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 16px;
   margin-bottom: 12px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.28s ease;
+  border: 1px solid #f0f2f5;
 }
 
+/* 悬浮：轻微上移 + 阴影加深 */
 .user-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
   border-color: #409EFF;
 }
 
 .user-card.active {
   border-color: #409EFF;
-  background-color: #ecf5ff;
+  background: linear-gradient(135deg, #edf7ff 0%, #e8f3ff 100%);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
 }
 
+/* 卡片内容 */
 .user-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
-
 .user-code {
-  font-weight: bold;
-  color: #333;
+  font-weight: 600;
+  font-size: 15px;
+  color: #222;
 }
-
-.user-time {
+.user-code-sub {
   font-size: 12px;
   color: #999;
+  margin-left: 4px;
+  font-weight: normal;
+}
+.user-time {
+  font-size: 12px;
+  color: #86909c;
+  white-space: nowrap;
 }
 
 .user-card-body {
   font-size: 14px;
   line-height: 1.5;
 }
-
 .user-location {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
 }
-
+.user-location .label {
+  color: #4e5969;
+  font-weight: 500;
+  font-size: 13px;
+}
+.user-location .value {
+  color: #1d2129;
+  font-family: monospace;
+  font-size: 13px;
+}
 .user-info {
   font-size: 12px;
   color: #666;
-  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed #f0f2f5;
+  margin-top: 6px;
 }
 
-.user-location .label {
-  color: #666;
-}
-
-.user-location .value {
-  color: #333;
-  font-family: monospace;
-}
-
-.loading,
-.error,
-.user-list-loading,
-.user-list-empty {
+/* 状态 */
+.loading, .error {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
+  font-size: 14px;
 }
-
 .error {
   color: #f56c6c;
 }
-
-.user-list-loading,
-.user-list-empty {
-  position: relative;
-  top: auto;
-  left: auto;
-  transform: none;
-  padding: 40px 0;
+.user-list-loading, .user-list-empty {
+  padding: 50px 0;
   color: #999;
+  text-align: center;
+  font-size: 14px;
 }
 
 @media (max-width: 768px) {
   .user-map-container {
     flex-direction: column;
+    gap: 16px;
   }
-
   .user-list {
     width: 100%;
-    height: 200px;
-    border-left: none;
-    border-top: 1px solid #eaeaea;
+    height: auto;
+    max-height: 280px;
   }
 }
 </style>
