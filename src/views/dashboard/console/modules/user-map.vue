@@ -76,8 +76,8 @@
             </div>
             <div class="user-card-body">
               <div class="user-location">
-                <span class="label">经纬度</span>
-                <span class="value">{{ `${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}` }}</span>
+                <span class="label">当前地址</span>
+                <span class="value">{{ user.address || '获取中...' }}</span>
               </div>
               <div class="user-info" v-if="user.ckl || user.dsl">
                 查勘量: {{ user.ckl || '-' }} &nbsp;&nbsp;|&nbsp;&nbsp; 定损量: {{ user.dsl || '-' }}
@@ -112,7 +112,7 @@
           >
             <div class="path-time">{{ formatTime(item.createTime) }}</div>
             <div class="path-coord">
-              {{ item.latitude.toFixed(4) }}, {{ item.longitude.toFixed(4) }}
+              {{ item.address || '解析中...' }}
             </div>
           </div>
           <div v-if="!currentUserPathList.length" class="no-path">暂无轨迹点</div>
