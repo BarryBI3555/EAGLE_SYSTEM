@@ -678,19 +678,24 @@ onBeforeUnmount(() => {
 }
 .user-location {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  gap: 30px;        /* 中间固定间隔 */
+  align-items: flex-start;
   margin-bottom: 6px;
+  line-height: 1.5;
 }
 .user-location .label {
   color: #4e5969;
   font-weight: 500;
   font-size: 13px;
+  white-space: nowrap;
 }
 .user-location .value {
   color: #1d2129;
-  font-family: monospace;
   font-size: 13px;
+  flex: 1;
+  text-align: right;      /* 右对齐 */
+  white-space: pre-line;
+  word-break: break-all; /* 自动换行 */
 }
 .user-info {
   font-size: 12px;
