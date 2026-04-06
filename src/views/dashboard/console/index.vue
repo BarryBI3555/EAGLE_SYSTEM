@@ -12,8 +12,10 @@
 </script>
 
 <style scoped>
-.map-page {
-  width: 100%;
-  padding: 20px;
-}
+  .map-page {
+    width: 100%;
+    height: 75vh; /* 关键：让父级占满屏幕高度 */
+    padding: 10px;
+    box-sizing: border-box;
+  }
 </style>
