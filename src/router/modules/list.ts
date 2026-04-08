@@ -13,7 +13,7 @@ export const listRoutes: AppRouteRecord = {
     {
       path: 'index',
       name: 'ListIndex',
-      component: '/dashboard/console',
+      component: '/dashboard/personnel',
       meta: {
         title: 'menus.list.title',
         keepAlive: false

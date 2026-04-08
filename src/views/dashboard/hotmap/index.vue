@@ -1,12 +1,12 @@
 <!-- 人员路线地图页面 -->
 <template>
   <div class="map-page">
-    <UserMap />
+    <HotMap />
   </div>
 </template>
 
 <script setup lang="ts">
-  import UserMap from './modules/user-map.vue'
+  import HotMap from './modules/hot-map.vue'
 
   defineOptions({ name: 'Console' })
 </script>
