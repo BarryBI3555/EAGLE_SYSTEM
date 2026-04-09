@@ -6,8 +6,8 @@ export const testRoutes: AppRouteRecord = {
     component: '/index/index',
     meta: {
         title: 'menus.test.title',
-        icon: 'ri:user-3-line',
-        roles: ['R_SUPER', 'R_ADMIN']
+        icon: 'ri:test-tube-line',
+        // roles: ['R_SUPER', 'R_ADMIN']
     },
     children: [
         {

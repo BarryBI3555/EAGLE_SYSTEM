@@ -6,7 +6,7 @@ export const listRoutes: AppRouteRecord = {
   component: '/index/index',
   meta: {
     title: 'menus.list.title',
-    icon: 'ri:list-line',
+    icon: 'ri:file-list-line',
     roles: ['R_SUPER', 'R_ADMIN']
   },
   children: [

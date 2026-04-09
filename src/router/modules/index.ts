@@ -7,6 +7,7 @@ import {complaintRoutes} from './complaint'
 import {resourceRoutes} from './resource'
 import {profileRoutes} from './profile'
 import {listRoutes} from './list'
+import { testRoutes } from './test'
 
 /**
  * 导出所有模块化路由
@@ -19,5 +20,6 @@ export const routeModules: AppRouteRecord[] = [
     complaintRoutes,
     resourceRoutes,
     profileRoutes,
-    listRoutes
+    listRoutes,
+    testRoutes
 ]

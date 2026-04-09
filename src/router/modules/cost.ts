@@ -6,7 +6,7 @@ export const costRoutes: AppRouteRecord = {
   component: '/index/index',
   meta: {
     title: 'menus.cost.title',
-    icon: 'ri:money-line',
+    icon: 'ri:money-cny-box-line',
     roles: ['R_SUPER', 'R_ADMIN']
   },
   children: [

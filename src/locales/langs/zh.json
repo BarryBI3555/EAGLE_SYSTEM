@@ -230,6 +230,10 @@
     "gohome": "返回首页"
   },
   "menus": {
+    "test": {
+      "title": "测试页",
+      "user": "用户管理"
+    },
     "login": {
       "title": "登录"
     },
