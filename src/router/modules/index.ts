@@ -23,5 +23,5 @@ export const routeModules: AppRouteRecord[] = [
     resourceRoutes,
     profileRoutes,
     listRoutes,
-    testRoutes
+    // testRoutes
 ]
