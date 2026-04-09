@@ -94,6 +94,13 @@
             itemStyle: {
               color: computedColor,
               borderRadius: 2
+            },
+            label: {
+              show: true,
+              position: 'bottom',
+              formatter: '{c}',
+              color: '#666',
+              fontSize: 10
             }
           }
         ]

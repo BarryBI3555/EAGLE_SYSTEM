@@ -273,7 +273,11 @@
     },
     "list": {
       "title": "清单管理"
-    }
+    },
+    "indicator": {
+      "title": "关键指标",
+      "subtitle": "指标图表"
+    } 
   },
   "table": {
     "form": {
