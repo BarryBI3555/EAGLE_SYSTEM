@@ -24,7 +24,7 @@ export const routeModules: AppRouteRecord[] = [
     resourceRoutes,
     profileRoutes,
     listRoutes,
-    indicatorRoutes,
+    // indicatorRoutes,
     dataTableRoutes,
     // testRoutes
 ]
