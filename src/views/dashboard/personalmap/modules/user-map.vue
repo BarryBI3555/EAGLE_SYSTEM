@@ -55,6 +55,7 @@
               :class="{ active: selectedUser === user.usercode }"
               @click="showUserDetail(user)"
             >
+              <!-- 人员姓名与工号 -->
               <div class="user-card-header">
                 <span class="user-code">
                   {{ user.username || user.usercode }}
