@@ -52,7 +52,7 @@ export function scriptErrorHandler(
 ): boolean {
   console.error('[ScriptError]', { message, source, lineno, colno, error })
   // reportError({ type: 'script', message, source, lineno, colno, error })
-  return true // 阻止默认控制台报错，可根据需求改
+  return false // 阻止默认控制台报错，可根据需求改
 }
 
 /**

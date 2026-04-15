@@ -12,6 +12,7 @@
   import { toggleTransition } from './utils/ui/animation'
   import { checkStorageCompatibility } from './utils/storage'
   import { initializeTheme } from './hooks/core/useTheme'
+import { AnyARecord } from 'dns'
 
   const userStore = useUserStore()
   const { language } = storeToRefs(userStore)
@@ -31,4 +32,29 @@
     toggleTransition(false)
     systemUpgrade()
   })
+
+
+  const debounce = (fn:any, delay: any) => {
+  let timer: any = null;
+
+   return function (this: any) {
+    let context = this;
+    let args = arguments;
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      fn.apply(context, args);
+ 
+    }, delay);
+  }
+}
+ 
+const _ResizeObserver = window.ResizeObserver;
+window.ResizeObserver = class ResizeObserver extends _ResizeObserver {
+  constructor(callback: any) {
+    callback = debounce(callback, 16);
+    super(callback);
+  }
+}
+  
+
 </script>
