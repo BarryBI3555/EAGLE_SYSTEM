@@ -14,16 +14,9 @@
         <!-- 列表模式 -->
         <div v-if="!showDetailMode" class="list-mode">
           <div class="user-list-fixed">
-            <div class="title-row">
+            <!-- 第一行：标题 + 日期 + 返回主页 -->
+            <div class="top-title-row">
               <h3 class="user-list-title">人员列表</h3>
-              <img
-                src="@/assets/images/icon/Home.png"
-                class="home-img-btn"
-                @click="goToHomePage"
-                title="返回主页"
-              />
-            </div>
-            <div class="search-date-row">
               <el-date-picker
                 v-model="selectedDate"
                 type="date"
@@ -31,7 +24,31 @@
                 format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
                 class="date-picker"
+                @change="fetchGroupList"
               />
+              <img
+                src="@/assets/images/icon/Home.png"
+                class="home-img-btn"
+                @click="goToHomePage"
+                title="返回主页"
+              />
+            </div>
+
+            <!-- 第二行：片区下拉框 + 搜索框 -->
+            <div class="search-date-row" style="margin-top: 10px">
+              <el-select
+                v-model="selectedGroupCode"
+                placeholder="全部片区"
+                class="group-select"
+                clearable
+              >
+                <el-option
+                  v-for="item in groupOptions"
+                  :key="item.groupscode"
+                  :label="item.groups"
+                  :value="item.groupscode"
+                />
+              </el-select>
               <el-input
                 v-model="searchKeyword"
                 placeholder="搜索姓名/工号"
@@ -39,10 +56,12 @@
                 clearable
               />
             </div>
+
             <el-button type="primary" @click="filterUsers" style="width: 100%; margin-top: 10px"
               >筛选</el-button
             >
           </div>
+
           <div class="user-list-scroll">
             <div v-if="loading" class="user-list-loading">加载中...</div>
             <div v-else-if="filteredUserList.length === 0" class="user-list-empty"
@@ -74,6 +93,7 @@
                   查勘量: {{ user.ckl || '-' }} &nbsp;&nbsp;|&nbsp;&nbsp; 定损量:
                   {{ user.dsl || '-' }}
                 </div>
+                <div class="user-group" v-if="user.groups"> 所属片区：{{ user.groups }} </div>
               </div>
             </div>
           </div>
@@ -99,12 +119,13 @@
               <div
                 ><label>定损量</label><span>{{ currentDetailUser.dsl || '-' }}</span></div
               >
+              <div
+                ><label>所属片区</label><span>{{ currentDetailUser.groups || '-' }}</span></div
+              >
             </div>
           </div>
           <div class="detail-path-list">
             <div class="path-title">轨迹经纬度记录</div>
-
-            <!-- 轨迹列表：只显示有效地址数据 -->
             <div
               v-for="(item, idx) in currentUserPathList.filter(
                 (item) =>
@@ -120,8 +141,6 @@
               <div class="path-time">{{ formatTime(item.createTime) }}</div>
               <div class="path-coord">{{ item.address || '解析中...' }}</div>
             </div>
-
-            <!-- 轨迹加载提示：修复刚进入显示暂无轨迹点问题 -->
             <div v-if="trackLoading" class="no-path"> 轨迹解析中... </div>
             <div
               v-else-if="
@@ -162,55 +181,64 @@
   }
 
   // ==================== 地图实例与图层对象 ====================
-  let map: any = null // 地图主实例
-  let markerLayer: any = null // 人员点位图层
-  let labelLayer: any = null // 人员名称标签图层
-  let trackLineLayer: any = null // 轨迹连线图层
-  let startEndMarkerLayer: any = null // 轨迹起点/终点标记图层
-  let carMarkerLayer: any = null // 车辆动画标记图层
-  let tempMarker: any = null // 点击轨迹点时的临时高亮标记
-  let infoWindow: any = null // 地图信息弹窗
-  let currentTrackBounds: any = null // 当前轨迹的自动视野范围
-  const currentTrackPadding = { top: 50, bottom: 50, left: 50, right: 50 } // 轨迹视野边距
+  let map: any = null
+  let markerLayer: any = null
+  let labelLayer: any = null
+  let trackLineLayer: any = null
+  let startEndMarkerLayer: any = null
+  let carMarkerLayer: any = null
+  let tempMarker: any = null
+  let infoWindow: any = null
+  let currentTrackBounds: any = null
+  const currentTrackPadding = { top: 50, bottom: 50, left: 50, right: 50 }
 
   // ==================== 响应式状态 ====================
-  const loading = ref(true) // 加载状态
-  const error = ref('') // 错误提示信息
-  const userList = ref<any[]>([]) // 所有人员最新位置列表
-  const isSidebarCollapsed = ref(false) // 侧边栏是否折叠
-  const selectedUser = ref<string>('') // 当前选中的人员工号
-  const searchKeyword = ref('') // 搜索关键词
-  const showDetailMode = ref(false) // 是否显示轨迹详情模式
-  const currentDetailUser = ref<any>(null) // 当前查看详情的用户
-  const currentUserPathList = ref<any[]>([]) // 当前用户的轨迹点列表
-  const trackLoading = ref(false) // 轨迹地址解析加载状态
+  const loading = ref(true)
+  const error = ref('')
+  const userList = ref<any[]>([])
+  const isSidebarCollapsed = ref(false)
+  const selectedUser = ref<string>('')
+  const searchKeyword = ref('')
+  const showDetailMode = ref(false)
+  const currentDetailUser = ref<any>(null)
+  const currentUserPathList = ref<any[]>([])
+  const trackLoading = ref(false)
+
+  // 片区相关
+  const groupOptions = ref<any[]>([]) // 片区下拉选项
+  const selectedGroupCode = ref<string>('') // 选中的片区code
 
   // ==================== 日期处理 ====================
   const today = new Date()
-  // 格式化日期为 YYYY-MM-DD 字符串
   const formatDate = (date: Date) => {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
     return `${year}-${month}-${day}`
   }
-  // 默认选中今天
   const selectedDate = ref<string | null>(formatDate(today))
 
   // ==================== 计算属性 ====================
-  // 根据关键词过滤人员列表（姓名/工号）
+  // 搜索 + 片区 双重筛选
   const filteredUserList = computed(() => {
-    if (!searchKeyword.value) return userList.value
-    const kw = searchKeyword.value.toLowerCase()
-    return userList.value.filter((u) => {
-      const name = (u || '').toLowerCase()
-      const code = (u.usercode || '').toLowerCase()
-      return name.includes(kw) || code.includes(kw)
-    })
+    let list = [...userList.value]
+    // 关键词过滤
+    if (searchKeyword.value) {
+      const kw = searchKeyword.value.toLowerCase()
+      list = list.filter((u) => {
+        const name = (u.username || '').toLowerCase()
+        const code = (u.usercode || '').toLowerCase()
+        return name.includes(kw) || code.includes(kw)
+      })
+    }
+    // 片区过滤
+    if (selectedGroupCode.value) {
+      list = list.filter((u) => u.groupscode === selectedGroupCode.value)
+    }
+    return list
   })
 
   // ==================== 工具函数 ====================
-  // 格式化时间为本地标准时间
   const formatTime = (timeString: string) => {
     const date = new Date(timeString)
     return date.toLocaleString('zh-CN', {
@@ -226,18 +254,16 @@
   // ==================== 地图初始化 ====================
   const initMap = async () => {
     try {
-      // 等待腾讯地图SDK加载完成
       let attempts = 0
       while (!window.TMap && attempts < 100) {
         await new Promise((resolve) => setTimeout(resolve, 100))
         attempts++
       }
-      if (!window.TMap) throw new Error('腾讯地图 GL SDK 加载失败，请检查网络')
+      if (!window.TMap) throw new Error('腾讯地图 GL SDK 加载失败')
 
       const container = document.getElementById('map-container')
       if (!container) throw new Error('地图容器未找到')
 
-      // 创建地图实例
       map = new window.TMap.Map(container, {
         center: new window.TMap.LatLng(30.6799, 104.0571),
         zoom: 12,
@@ -248,18 +274,15 @@
         mapStyleId: 'style1'
       })
 
-      // 设置地图控件位置到左上角
-      let zoomControl = map.getControl(window.TMap.constants.DEFAULT_CONTROL_ID.ZOOM)
-      let rotationControl = map.getControl(window.TMap.constants.DEFAULT_CONTROL_ID.ROTATION)
-      if (zoomControl) {
-        zoomControl.setPosition(window.TMap.constants.CONTROL_POSITION.TOP_LEFT)
-      }
-      if (rotationControl) {
+      const zoomControl = map.getControl(window.TMap.constants.DEFAULT_CONTROL_ID.ZOOM)
+      const rotationControl = map.getControl(window.TMap.constants.DEFAULT_CONTROL_ID.ROTATION)
+      if (zoomControl) zoomControl.setPosition(window.TMap.constants.CONTROL_POSITION.TOP_LEFT)
+      if (rotationControl)
         rotationControl.setPosition(window.TMap.constants.CONTROL_POSITION.TOP_LEFT)
-      }
 
-      // 加载人员位置数据
+      // 初始化后加载数据
       await fetchLatestLocations()
+      await fetchGroupList()
       loading.value = false
     } catch (err: any) {
       console.error('地图初始化失败', err)
@@ -268,15 +291,38 @@
     }
   }
 
-  // ==================== 获取所有人员最新位置 ====================
-  const fetchLatestLocations = async (date?: string) => {
+  // ==================== 获取片区列表（日期改变时自动调用） ====================
+  const fetchGroupList = async () => {
     try {
-      let url = 'http://localhost:8080/api/locations/latest'
-      if (date) url += `?date=${date}`
+      let url = 'http://localhost:8080/api/locations/groups'
+      if (selectedDate.value) url += `?date=${selectedDate.value}`
       const res = await fetch(url)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      clearOverlays() // 清空旧图层
+      // 按 groupscode 升序排列
+      groupOptions.value = (data || []).sort((a: any, b: any) =>
+        a.groupscode.localeCompare(b.groupscode)
+      )
+      selectedGroupCode.value = '' // 切换日期清空片区选择
+    } catch (err) {
+      console.error('获取片区失败', err)
+      groupOptions.value = []
+    }
+  }
+
+  // ==================== 获取人员最新位置（支持日期+片区筛选） ====================
+  const fetchLatestLocations = async (date?: string, groupCode?: string) => {
+    try {
+      const params = new URLSearchParams()
+      if (date) params.append('date', date)
+      if (groupCode) params.append('groupscode', groupCode)
+      const query = params.toString() ? `?${params.toString()}` : ''
+      const url = `http://localhost:8080/api/locations/latest${query}`
+
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      clearOverlays()
 
       if (!data || data.length === 0) {
         userList.value = []
@@ -284,7 +330,6 @@
       }
       userList.value = data
 
-      // 构建人员点位
       const geometries = userList.value.map((user) => ({
         id: `user-${user.usercode}`,
         styleId: 'location',
@@ -292,7 +337,6 @@
         properties: { title: `${user.username || ''} (${user.usercode})`, user }
       }))
 
-      // 创建点位图层
       markerLayer = new window.TMap.MultiMarker({
         map,
         styles: {
@@ -306,13 +350,11 @@
         geometries
       })
 
-      // 点击地图点位 → 打开轨迹详情
       markerLayer.on('click', (evt: any) => {
         const user = evt.geometry?.properties?.user
         if (user) showUserDetail(user)
       })
 
-      // 构建人员名称标签
       const labelGeometries = userList.value.map((user) => ({
         id: `label-${user.usercode}`,
         styleId: 'userLabel',
@@ -321,7 +363,6 @@
         offset: { x: 0, y: 20 }
       }))
 
-      // 创建标签图层
       labelLayer = new window.TMap.MultiLabel({
         map,
         styles: {
@@ -337,7 +378,6 @@
         geometries: labelGeometries
       })
 
-      // 自动调整视野，显示所有人员
       if (geometries.length) {
         const bounds = new window.TMap.LatLngBounds()
         geometries.forEach((g) => bounds.extend(g.position))
@@ -349,33 +389,38 @@
     }
   }
 
-  // 点击筛选按钮 → 根据日期刷新位置
+  // 筛选按钮
   const filterUsers = async () => {
-    await fetchLatestLocations(selectedDate.value || undefined)
+    await fetchLatestLocations(
+      selectedDate.value || undefined,
+      selectedGroupCode.value || undefined
+    )
   }
 
-  // 返回主页 → 重置所有状态并刷新列表
+  // 返回主页
   const goToHomePage = async () => {
     selectedUser.value = ''
     searchKeyword.value = ''
+    selectedGroupCode.value = ''
     showDetailMode.value = false
     currentDetailUser.value = null
     currentUserPathList.value = []
     clearOverlays()
     await fetchLatestLocations(selectedDate.value || undefined)
+    await fetchGroupList()
   }
 
-  // 从轨迹详情返回人员列表
+  // 返回列表
   const backToList = () => {
     showDetailMode.value = false
     currentDetailUser.value = null
     currentUserPathList.value = []
     selectedUser.value = ''
     clearOverlays()
-    fetchLatestLocations(selectedDate.value || undefined)
+    fetchLatestLocations(selectedDate.value || undefined, selectedGroupCode.value || undefined)
   }
 
-  // 显示某个人的轨迹详情
+  // 查看人员详情
   const showUserDetail = async (user: any) => {
     selectedUser.value = user.usercode
     showDetailMode.value = true
@@ -383,10 +428,10 @@
     await loadUserTrack(user.usercode)
   }
 
-  // ==================== 加载单个用户全天轨迹 ====================
+  // ==================== 加载轨迹 ====================
   const loadUserTrack = async (usercode: string) => {
     try {
-      trackLoading.value = true // 开启轨迹加载状态
+      trackLoading.value = true
       if (!map) {
         error.value = '地图未初始化'
         trackLoading.value = false
@@ -394,7 +439,6 @@
       }
       clearOverlays()
 
-      // 请求轨迹接口
       let url = `http://localhost:8080/api/locations/user/${usercode}`
       if (selectedDate.value) url += `?date=${selectedDate.value}`
       const res = await fetch(url)
@@ -408,16 +452,13 @@
         return
       }
 
-      // 按时间正序 → 用于绘制轨迹线
       const sorted = [...data].sort(
         (a, b) => new Date(a.createTime).getTime() - new Date(b.createTime).getTime()
       )
-      // 按时间倒序 → 用于列表展示最新点在上
       currentUserPathList.value = [...data].sort(
         (a, b) => new Date(b.createTime).getTime() - new Date(a.createTime).getTime()
       )
 
-      // 构造轨迹经纬度数组
       const path = sorted.map((p) => new window.TMap.LatLng(p.latitude, p.longitude))
       if (path.length < 2) {
         error.value = '轨迹点不足，无法回放'
@@ -425,7 +466,6 @@
         return
       }
 
-      // 绘制带箭头的轨迹线
       trackLineLayer = new window.TMap.MultiPolyline({
         map,
         styles: {
@@ -441,7 +481,6 @@
         geometries: [{ id: `track-${usercode}`, styleId: 'arrow', paths: path }]
       })
 
-      // 绘制起点 & 终点
       startEndMarkerLayer = new window.TMap.MultiMarker({
         map,
         styles: {
@@ -464,7 +503,6 @@
         ]
       })
 
-      // 创建车辆动画图标
       const carIcon = 'https://mapapi.qq.com/web/lbs/javascriptGL/demo/img/car.png'
       carMarkerLayer = new window.TMap.MultiMarker({
         map,
@@ -481,22 +519,15 @@
         geometries: [{ id: 'car', styleId: 'car', position: path[0] }]
       })
 
-      // 自动缩放视野以包含整条轨迹
       const bounds = new window.TMap.LatLngBounds()
       path.forEach((p) => bounds.extend(p))
       currentTrackBounds = bounds
       map.fitBounds(bounds, { padding: currentTrackPadding })
 
-      // 延迟启动轨迹回放
-      setTimeout(() => {
-        startPlayback(path)
-      }, 200)
-
-      // 地址解析延迟后关闭加载状态
+      setTimeout(() => startPlayback(path), 200)
       setTimeout(() => {
         trackLoading.value = false
       }, 2000)
-
       error.value = ''
     } catch (err: any) {
       console.error('获取轨迹失败:', err)
@@ -505,25 +536,14 @@
     }
   }
 
-  // ==================== 车辆沿轨迹回放 ====================
+  // 轨迹回放
   const startPlayback = (path: any[]) => {
-    if (!carMarkerLayer) {
-      console.error('车辆标记未创建')
-      error.value = '车辆标记未创建，无法回放'
-      return
-    }
-    if (path.length < 2) {
-      error.value = '轨迹点数不足，无法回放'
-      return
-    }
-
+    if (!carMarkerLayer || path.length < 2) return
     try {
-      // 车辆沿路径移动
       carMarkerLayer.moveAlong({ car: { path, speed: 500 } }, { autoRotation: true })
-      // 移动时擦除已走过的轨迹
       carMarkerLayer.on('moving', (e: any) => {
         const passed = e.car?.passedLatLngs
-        if (passed && passed.length > 0 && trackLineLayer) {
+        if (passed && passed.length && trackLineLayer) {
           try {
             trackLineLayer.eraseTo(
               `track-${currentDetailUser.value?.usercode}`,
@@ -531,32 +551,28 @@
               passed[passed.length - 1]
             )
           } catch (err: any) {
-            console.error('擦除轨迹失败:', err)
+            console.error('擦轨迹失败', err)
           }
         }
       })
     } catch (err: any) {
-      console.error('moveAlong 调用失败:', err)
-      error.value = `轨迹回放失败: ${err.message}`
+      console.error('回放失败', err)
     }
   }
 
-  // 清除临时标记并恢复轨迹视野
+  // 清除临时标记
   const clearTempMarkerAndRestoreBounds = () => {
     if (tempMarker) {
       tempMarker.setMap(null)
       tempMarker = null
     }
-    if (currentTrackBounds && map) {
+    if (currentTrackBounds && map)
       map.fitBounds(currentTrackBounds, { padding: currentTrackPadding })
-    }
   }
 
-  // ==================== 点击轨迹点 → 在地图上显示该点 ====================
+  // 点击轨迹点
   const showPointOnMap = (point: any) => {
     if (!map) return
-
-    // 关闭已存在的弹窗与标记
     if (infoWindow) {
       infoWindow.close()
       infoWindow = null
@@ -567,8 +583,6 @@
     }
 
     const latLng = new window.TMap.LatLng(point.latitude, point.longitude)
-
-    // 创建临时高亮标记
     tempMarker = new window.TMap.MultiMarker({
       map,
       styles: {
@@ -582,60 +596,35 @@
       geometries: [{ id: 'temp-marker', styleId: 'highlight', position: latLng }]
     })
 
-    // 生成唯一关闭按钮ID，防止事件冲突
     const closeBtnId = `custom-info-close-${Date.now()}`
-
-    // 自定义深色信息弹窗内容
     const content = `
-  <div style="
-    background: #1f2937;
-    color: #e5e7eb;
-    border-radius: 12px;
-    padding: 12px 16px;
-    min-width: 240px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    font-size: 13px;
-    line-height: 1.5;
-    border: 1px solid #374151;
-  ">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-      <span style="font-weight: bold; font-size: 14px;">📍 轨迹点详情</span>
-      <span id="${closeBtnId}" style="cursor: pointer; font-size: 18px; line-height: 1; color: #9ca3af;">&times;</span>
+  <div style="background:#1f2937;color:#e5e7eb;border-radius:12px;padding:12px 16px;min-width:240px;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:13px;line-height:1.5;border:1px solid #374151;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-weight:bold;font-size:14px;">📍 轨迹点详情</span>
+      <span id="${closeBtnId}" style="cursor:pointer;font-size:18px;color:#9ca3af;">&times;</span>
     </div>
-    <div style="margin-bottom: 6px;">🕒 时间：${formatTime(point.createTime)}</div>
-    <div style="margin-bottom: 6px;">🏠 地址：${point.address || '解析中...'}</div>
+    <div>🕒 时间：${formatTime(point.createTime)}</div>
+    <div style="margin:6px 0;">🏠 地址：${point.address || '解析中...'}</div>
     <div>📍 坐标：${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}</div>
-  </div>
-`
+  </div>`
 
-    // 创建并打开信息窗
     infoWindow = new window.TMap.InfoWindow({
       map,
       position: latLng,
-      content: content,
+      content,
       offset: { x: 0, y: -35 },
       enableCustom: true
     })
     infoWindow.open()
-
-    // 绑定关闭按钮事件
-    const closeBtn = document.getElementById(closeBtnId)
-    if (closeBtn) {
-      closeBtn.onclick = (e) => {
-        e.stopPropagation()
-        if (infoWindow) {
-          infoWindow.close()
-          infoWindow = null
-        }
-        clearTempMarkerAndRestoreBounds()
-      }
-    }
-
-    // 地图居中到该点
+    document.getElementById(closeBtnId)?.addEventListener('click', () => {
+      infoWindow?.close()
+      infoWindow = null
+      clearTempMarkerAndRestoreBounds()
+    })
     map.setCenter(latLng)
   }
 
-  // ==================== 清空所有地图覆盖物 ====================
+  // 清空覆盖物
   const clearOverlays = () => {
     if (carMarkerLayer) carMarkerLayer.setMap(null)
     if (markerLayer) markerLayer.setMap(null)
@@ -644,8 +633,6 @@
     if (startEndMarkerLayer) startEndMarkerLayer.setMap(null)
     if (tempMarker) tempMarker.setMap(null)
     if (infoWindow) infoWindow.close()
-
-    // 释放引用
     carMarkerLayer =
       markerLayer =
       labelLayer =
@@ -657,13 +644,10 @@
     currentTrackBounds = null
   }
 
-  // ==================== 生命周期 ====================
-  // 页面挂载 → 初始化地图
+  // 生命周期
   onMounted(() => {
-    initMap() 
+    initMap()
   })
-
-  // 页面销毁 → 清理资源，防止内存泄漏
   onBeforeUnmount(() => {
     clearOverlays()
     if (map) {
@@ -675,29 +659,26 @@
 
 <style scoped>
   /* ========== 深色主题样式 ========== */
-  :deep(.el-input__inner) {
+  :deep(.el-input__inner),
+  :deep(.el-select__input) {
     color: #e5e7eb !important;
     background-color: #1f2937 !important;
     border-color: #374151 !important;
   }
-  :deep(.el-input__inner::placeholder) {
+  :deep(.el-input__inner::placeholder),
+  :deep(.el-select__input::placeholder) {
     color: #9ca3af !important;
   }
-  :deep(.el-date-editor.el-input--mini),
-  :deep(.el-date-editor.el-input),
-  :deep(.el-date-editor) {
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-  }
-  :deep(.el-input__wrapper) {
+  :deep(.el-input__wrapper),
+  :deep(.el-select__wrapper) {
     background-color: #1f2937 !important;
     box-shadow: none !important;
     border: 1px solid #9ca3af !important;
     border-radius: 4px;
   }
   :deep(.el-input__prefix),
-  :deep(.el-input__suffix) {
+  :deep(.el-input__suffix),
+  :deep(.el-select__suffix) {
     color: #9ca3af !important;
   }
   :deep(.el-button--primary) {
@@ -715,15 +696,48 @@
     color: #f3f4f6;
   }
 
+  /* 顶部一行布局 */
+  .top-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0;
+  }
+  .user-list-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #f3f4f6;
+    margin: 0;
+    white-space: nowrap;
+  }
+  .date-picker {
+    flex: 1;
+    min-width: 150px;
+    max-width: 225px;
+  }
+  .group-select {
+    flex: 1;
+    min-width: 150px;
+    max-width: 225px;
+  }
+  .home-img-btn {
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    opacity: 0.85;
+    filter: brightness(0) invert(1);
+    flex-shrink: 0;
+  }
+  .home-img-btn:hover {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+
   .search-date-row {
     display: flex;
     gap: 8px;
     align-items: center;
-  }
-  .search-date-row .date-picker {
-    flex: 1;
-    min-width: 150px;
-    max-width: 225px;
   }
   .search-date-row .search-input {
     flex: 1;
@@ -736,7 +750,6 @@
     height: 100%;
     background: #111827;
   }
-
   .map-content {
     flex: 1;
     height: 100%;
@@ -744,21 +757,18 @@
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    width: 100%;
   }
   .map-container {
     width: 100%;
     height: 100%;
   }
-
   .sidebar-container {
     position: relative;
     height: 100%;
     flex-shrink: 0;
   }
-
   .user-list {
-    width: 320px;
+    width: 340px;
     height: 100%;
     background: #1f2937;
     border-radius: 12px;
@@ -768,10 +778,9 @@
     flex-direction: column;
     overflow: hidden;
     box-sizing: border-box;
-    transition: all 0.3s ease; /* 动画 */
+    transition: all 0.3s ease;
     flex-shrink: 0;
   }
-  /* 收缩状态 */
   .user-list.collapsed {
     width: 0;
     padding: 0;
@@ -781,7 +790,6 @@
     opacity: 0;
     visibility: hidden;
   }
-
   .float-toggle-btn {
     position: fixed;
     right: 10px;
@@ -805,54 +813,23 @@
     background: #253f78;
     width: 30px;
   }
-
   .list-mode {
     display: flex;
     flex-direction: column;
     height: 100%;
   }
-
   .user-list-fixed {
     flex-shrink: 0;
     padding-bottom: 16px;
     border-bottom: 1px solid #374151;
     margin-bottom: 8px;
   }
-
-  .title-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-  }
-  .user-list-title {
-    font-size: 18px;
-    font-weight: 60;
-    color: #f3f4f6;
-    margin: 0;
-    letter-spacing: 0.5px;
-  }
-  .home-img-btn {
-    width: 26px;
-    height: 26px;
-    cursor: pointer;
-    transition: all 0.25s ease;
-    opacity: 0.85;
-    filter: brightness(0) invert(1);
-  }
-  .home-img-btn:hover {
-    opacity: 1;
-    transform: scale(1.08);
-  }
-
   .user-list-scroll {
     flex: 1;
     overflow-y: auto !important;
     padding-top: 12px;
-    padding-bottom: 4px;
     box-sizing: border-box;
   }
-
   .user-card {
     background: #2d3a4a;
     border-radius: 10px;
@@ -870,9 +847,7 @@
   .user-card.active {
     border-color: #3b82f6;
     background: linear-gradient(135deg, #1e2a3a 0%, #1f2c3c 100%);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
   }
-
   .user-card-header {
     display: flex;
     justify-content: space-between;
@@ -901,47 +876,44 @@
   }
   .user-location {
     display: flex;
-    gap: 30px;
+    justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 6px;
-    line-height: 1.5;
   }
   .user-location .label {
     color: #9ca3af;
-    font-weight: 50;
     font-size: 13px;
     white-space: nowrap;
   }
   .user-location .value {
     color: #e5e7eb;
     font-size: 13px;
-    flex: 1;
     text-align: right;
-    white-space: pre-line;
     word-break: break-all;
   }
   .user-info {
     font-size: 12px;
     color: #9ca3af;
-    padding-top: 6px;
+    padding: 6px 0;
     border-top: 1px dashed #374151;
-    margin-top: 6px;
+    margin: 6px 0;
   }
-
+  .user-group {
+    font-size: 12px;
+    color: #9ca3af;
+  }
   .detail-mode {
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
   }
-
   .detail-header {
     flex-shrink: 0;
     padding: 20px;
     background: linear-gradient(135deg, #1e2a3a 0%, #1f2c3c 100%);
     border-radius: 12px;
     margin-bottom: 16px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   }
   .detail-top {
     display: flex;
@@ -954,7 +926,6 @@
     font-weight: 700;
     color: #f3f4f6;
     margin: 0;
-    letter-spacing: 0.3px;
   }
   .detail-info-row {
     display: flex;
@@ -974,22 +945,18 @@
   }
   .detail-info-row span {
     color: #e5e7eb;
-    font-weight: 500;
   }
-
   .detail-path-list {
     flex: 1;
     overflow-y: auto !important;
     padding-top: 8px;
     padding-right: 8px;
   }
-
   .path-title {
     font-size: 14px;
     font-weight: 600;
     color: #d1d5db;
     margin-bottom: 12px;
-    padding-left: 4px;
   }
   .path-item {
     padding: 14px;
@@ -1003,19 +970,15 @@
   .path-item:hover {
     background: #374151;
     border-color: #4b5563;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   }
   .path-time {
     font-size: 12px;
     color: #9ca3af;
     margin-bottom: 6px;
-    font-weight: 500;
   }
   .path-coord {
     font-size: 13px;
-    font-family: 'Menlo', monospace;
     color: #e5e7eb;
-    font-weight: 500;
   }
   .no-path {
     padding: 40px 0;
@@ -1023,7 +986,6 @@
     color: #9ca3af;
     font-size: 14px;
   }
-
   .loading,
   .error {
     position: absolute;
@@ -1041,9 +1003,7 @@
     padding: 30px 0;
     text-align: center;
     color: #9ca3af;
-    font-size: 14px;
   }
-
   @media (max-width: 768px) {
     .user-map-container {
       flex-direction: column;
@@ -1058,7 +1018,6 @@
 </style>
 
 <style>
-  /* 全局滚动条样式 - 深色适配 */
   .user-map-container .user-list-scroll::-webkit-scrollbar,
   .user-map-container .detail-path-list::-webkit-scrollbar {
     width: 4px !important;
