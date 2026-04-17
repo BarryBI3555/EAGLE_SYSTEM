@@ -150,8 +150,8 @@ const fetchData = async () => {
   loading.value = true
   try {
     console.log('【前端请求】参数：', { queryTime: queryTime.value })
-    const res = await axios.get('http://localhost:8080/gzlSs/list', {
-      params: { queryTime: queryTime.value },
+    const res = await axios.get('http://localhost:8080/api/gzlSs/list', {
+      // params: { queryTime: queryTime.value },
       timeout: 10000
     })
     console.log('【后端返回】完整数据：', res.data)
