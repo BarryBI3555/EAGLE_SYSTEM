@@ -62,7 +62,7 @@ export const efficiencyRoutes: AppRouteRecord = {
             {
               path: 'cur_gzl',
               name: 'CurGzl',
-              component: '/efficiency/daily/periodic/table_cur_gzl',
+              component: '/efficiency/daily/periodic/table_cur_gzl_ry',
               meta: {
                 title: '人员当日工作量统计',
                 keepAlive: false
