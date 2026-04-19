@@ -16,9 +16,8 @@
           <div class="user-list-fixed">
             <!-- 第一行：标题 + 日期 + 返回主页 -->
             <div class="top-title-row">
-              
               <h3 class="user-list-title">人员列表</h3>
-              
+
               <img
                 src="@/assets/images/icon/Home.png"
                 class="home-img-btn"
@@ -26,7 +25,6 @@
                 title="返回主页"
                 position="right"
               />
-              
             </div>
             <!-- 第二行：日期选择器 + 片区下拉框 -->
             <div class="search-date-row" style="margin-top: 10px">
@@ -56,19 +54,14 @@
 
             <!-- 第三行： 搜索框 + 筛选按钮 -->
             <div class="search-date-row" style="margin-top: 10px">
-              
               <el-input
                 v-model="searchKeyword"
                 placeholder="搜索姓名/工号"
                 class="search-input"
                 clearable
               />
-              <el-button type="primary" @click="filterUsers"
-              >筛选</el-button
-            >
+              <el-button type="primary" @click="filterUsers">筛选</el-button>
             </div>
-
-            
           </div>
 
           <div class="user-list-scroll">
@@ -102,7 +95,7 @@
                   查勘量: {{ user.ckl || '-' }} &nbsp;&nbsp;|&nbsp;&nbsp; 定损量:
                   {{ user.dsl || '-' }}
                 </div>
-                <div class="user-group" v-if="user.group"> 所属片区：{{ user.group }} </div>
+                <div class="user-group" v-if="user.groups"> 所属片区：{{ user.groups }} </div>
               </div>
             </div>
           </div>
@@ -129,7 +122,7 @@
                 ><label>定损量</label><span>{{ currentDetailUser.dsl || '-' }}</span></div
               >
               <div
-                ><label>所属片区</label><span>{{ currentDetailUser.group || '-' }}</span></div
+                ><label>所属片区</label><span>{{ currentDetailUser.groups || '-' }}</span></div
               >
             </div>
           </div>
@@ -181,7 +174,7 @@
 
 <script setup lang="ts">
   import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
-  
+
   // 全局声明腾讯地图SDK，避免TS类型报错
   declare global {
     interface Window {
@@ -214,8 +207,8 @@
   const trackLoading = ref(false)
 
   // 片区相关
-  const groupOptions = ref<any[]>([]) // 片区下拉选项
-  const selectedGroupCode = ref<string>('') // 选中的片区code
+  const groupOptions = ref<any[]>([])
+  const selectedGroupCode = ref<string>('')
 
   // ==================== 日期处理 ====================
   const today = new Date()
@@ -228,23 +221,8 @@
   const selectedDate = ref<string | null>(formatDate(today))
 
   // ==================== 计算属性 ====================
-  // 搜索 + 片区 双重筛选
   const filteredUserList = computed(() => {
-    let list = [...userList.value]
-    // 关键词过滤
-    if (searchKeyword.value) {
-      const kw = searchKeyword.value.toLowerCase()
-      list = list.filter((u) => {
-        const name = (u.username || '').toLowerCase()
-        const code = (u.usercode || '').toLowerCase()
-        return name.includes(kw) || code.includes(kw)
-      })
-    }
-    // 片区过滤
-    if (selectedGroupCode.value) {
-      list = list.filter((u) => u.groupscode === selectedGroupCode.value)
-    }
-    return list
+    return userList.value
   })
 
   // ==================== 工具函数 ====================
@@ -289,7 +267,6 @@
       if (rotationControl)
         rotationControl.setPosition(window.TMap.constants.CONTROL_POSITION.TOP_LEFT)
 
-      // 初始化后加载数据
       await fetchLatestLocations()
       await fetchGroupList()
       loading.value = false
@@ -300,48 +277,43 @@
     }
   }
 
-  // ==================== 获取片区列表（日期改变时自动调用） ====================
+  // ==================== 获取片区列表 ====================
   const fetchGroupList = async () => {
     try {
-      // 首先获取所有片区列表
       let url = 'http://localhost:8080/api/locations/groups'
       if (selectedDate.value) url += `?date=${selectedDate.value}`
       const res = await fetch(url)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const allGroups = await res.json()
-      
-      // 然后获取当天有数据的用户列表
+
       const dataUrl = `http://localhost:8080/api/locations/latest${selectedDate.value ? `?date=${selectedDate.value}` : ''}`
       const dataRes = await fetch(dataUrl)
       if (!dataRes.ok) throw new Error(`HTTP ${dataRes.status}`)
       const userData = await dataRes.json()
-      
-      // 提取有数据的片区code
+
       const groupsWithData = new Set(userData.map((user: any) => user.groupscode))
-      
-      // 过滤出有数据的片区
-      const filteredGroups = (allGroups || []).filter((group: any) => 
+      const filteredGroups = (allGroups || []).filter((group: any) =>
         groupsWithData.has(group.groupscode)
       )
-      
-      // 按 groupscode 升序排列
+
       groupOptions.value = filteredGroups.sort((a: any, b: any) =>
         a.groupscode.localeCompare(b.groupscode)
       )
-      
-      selectedGroupCode.value = '' // 切换日期清空片区选择
+      selectedGroupCode.value = ''
     } catch (err) {
       console.error('获取片区失败', err)
       groupOptions.value = []
     }
   }
 
-  // ==================== 获取人员最新位置（支持日期+片区筛选） ====================
-  const fetchLatestLocations = async (date?: string, groupCode?: string) => {
+  // ==================== 获取人员最新位置（支持日期+片区+关键词） ====================
+  const fetchLatestLocations = async () => {
     try {
       const params = new URLSearchParams()
-      if (date) params.append('date', date)
-      if (groupCode) params.append('groupscode', groupCode)
+      if (selectedDate.value) params.append('date', selectedDate.value)
+      if (selectedGroupCode.value) params.append('groupscode', selectedGroupCode.value)
+      if (searchKeyword.value) params.append('keyword', searchKeyword.value)
+
       const query = params.toString() ? `?${params.toString()}` : ''
       const url = `http://localhost:8080/api/locations/latest${query}`
 
@@ -350,12 +322,11 @@
       const data = await res.json()
       clearOverlays()
 
-      if (!data || data.length === 0) {
-        userList.value = []
-        return
-      }
-      userList.value = data
+      userList.value = data || []
 
+      if (userList.value.length === 0) return
+
+      // 渲染点
       const geometries = userList.value.map((user) => ({
         id: `user-${user.usercode}`,
         styleId: 'location',
@@ -404,6 +375,7 @@
         geometries: labelGeometries
       })
 
+      // 自动聚焦所有点
       if (geometries.length) {
         const bounds = new window.TMap.LatLngBounds()
         geometries.forEach((g) => bounds.extend(g.position))
@@ -417,10 +389,7 @@
 
   // 筛选按钮
   const filterUsers = async () => {
-    await fetchLatestLocations(
-      selectedDate.value || undefined,
-      selectedGroupCode.value || undefined
-    )
+    await fetchLatestLocations()
   }
 
   // 返回主页
@@ -432,7 +401,7 @@
     currentDetailUser.value = null
     currentUserPathList.value = []
     clearOverlays()
-    await fetchLatestLocations(selectedDate.value || undefined)
+    await fetchLatestLocations()
     await fetchGroupList()
   }
 
@@ -443,7 +412,7 @@
     currentUserPathList.value = []
     selectedUser.value = ''
     clearOverlays()
-    fetchLatestLocations(selectedDate.value || undefined, selectedGroupCode.value || undefined)
+    fetchLatestLocations()
   }
 
   // 查看人员详情
