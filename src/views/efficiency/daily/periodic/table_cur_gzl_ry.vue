@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col gap-4 pb-5">
-    <!-- 搜索区域 -->
+    <!-- 搜索条件区域 -->
     <ArtSearchBar
       ref="searchBarRef"
       v-model="searchFormState"
@@ -15,11 +15,12 @@
       @reset="handleReset"
     />
 
-    <!-- 表格区域 -->
+    <!-- 表格卡片容器 -->
     <ElCard class="flex-1 art-table-card" style="margin-top: 0">
       <template #header>
         <div class="flex-cb">
-          <h4 class="m-0">人员当日工作量统计【统计时间：{{ allOriginData[0]?.maxTjTime }}】</h4>
+          <!-- 表格标题 + 动态统计时间 -->
+          <h4 class="m-0">人员当日工作量统计【统计时间：{{ currentMaxTjTime }}】</h4>
           <div class="flex gap-2">
             <ElTag v-if="tableError" type="danger">{{ tableError.message }}</ElTag>
             <ElTag v-else-if="loading" type="warning">加载中...</ElTag>
@@ -28,7 +29,7 @@
         </div>
       </template>
 
-      <!-- 表格工具栏 -->
+      <!-- 表格工具栏：刷新、导出、列设置等 -->
       <ArtTableHeader
         v-model:columns="columnChecks"
         :loading="loading"
@@ -38,6 +39,7 @@
       >
         <template #left>
           <ElSpace wrap>
+            <!-- 导出按钮：支持当前页 / 全部 -->
             <ElDropdown split-button type="primary" @click="handleExportCurrent" v-ripple>
               <ElIcon>
                 <Download />
@@ -54,6 +56,7 @@
         </template>
       </ArtTableHeader>
 
+      <!-- 主表格 -->
       <ArtTable
         ref="tableRef"
         :loading="loading"
@@ -69,97 +72,61 @@
         @pagination:size-change="handleSizeChange"
         @pagination:current-change="handleCurrentChange"
       >
-        <!-- 序号列 -->
+        <!-- 序号列：自动计算分页序号 -->
         <template #index="{ $index }">
           <span>{{ $index + 1 + (pagination.current - 1) * pagination.size }}</span>
         </template>
 
-        <!-- 部门列 -->
         <template #comName="{ row }">
           <span>{{ row.comName }}</span>
         </template>
-
-        <!-- 人员列 -->
         <template #userName="{ row }">
           <span>{{ row.userName }}</span>
         </template>
-
-        <!-- 用户编码列 -->
         <template #userCode="{ row }">
           <span>{{ row.userCode }}</span>
         </template>
-
-        <!-- 小组列 -->
         <template #groups="{ row }">
           <span>{{ row.groups }}</span>
         </template>
-
-        <!-- 小组编码列 -->
         <template #groupsCode="{ row }">
           <span>{{ row.groupsCode }}</span>
         </template>
-
-        <!-- 查勘件数量列 -->
         <template #ckJsl="{ row }">
           <span>{{ row.ckJsl }}</span>
         </template>
-
-        <!-- 查勘件未处理数量列 -->
         <template #ckJslWcl="{ row }">
           <span>{{ row.ckJslWcl }}</span>
         </template>
-
-        <!-- 查勘未处理数量列 -->
         <template #ckWcl="{ row }">
           <span>{{ row.ckWcl }}</span>
         </template>
-
-        <!-- 定损提交量列 -->
         <template #dsTjl="{ row }">
           <span>{{ row.dsTjl }}</span>
         </template>
-
-        <!-- 定损未处理量列 -->
         <template #dsWcl="{ row }">
           <span>{{ row.dsWcl }}</span>
         </template>
-
-        <!-- 定损支付量列 -->
         <template #dsZfl="{ row }">
           <span>{{ row.dsZfl }}</span>
         </template>
-
-        <!-- 首跟数量列 -->
         <template #shouGen="{ row }">
           <span>{{ row.shouGen }}</span>
         </template>
-
-        <!-- 后跟数量列 -->
         <template #houGen="{ row }">
           <span>{{ row.houGen }}</span>
         </template>
-
-        <!-- 调解数量列 -->
         <template #tiaoJie="{ row }">
           <span>{{ row.tiaoJie }}</span>
         </template>
-
-        <!-- 结案数量列 -->
         <template #ja="{ row }">
           <span>{{ row.ja }}</span>
         </template>
-
-        <!-- 总量列 -->
         <template #zl="{ row }">
           <span>{{ row.zl }}</span>
         </template>
 
-        <!-- 统计日期列 -->
-        <template #tjDate="{ row }">
-          <span>{{ row.tjDate }}</span>
-        </template>
-
-        <!-- ID列 -->
+        <!-- ID列：空值安全展示 -->
         <template #id="{ row }">
           <span>{{ row.id !== null && row.id !== undefined ? row.id : '' }}</span>
         </template>
@@ -176,51 +143,57 @@
   import * as XLSX from 'xlsx'
   import axios from 'axios'
 
+  // 组件名称（用于 devtools 调试）
   defineOptions({ name: 'DailyWorkloadTable' })
 
-  // 定义表格数据类型
+  // ==================== 1. 类型定义 ====================
+  /** 人员每日工作量表格数据类型 */
   interface DailyWorkloadData {
     id: number | null | undefined
-    comName: string
-    userName: string
-    userCode: string
-    groups: string
-    groupsCode: string | number // 兼容字符串/数字类型的编码
-    ckJsl: number
-    ckJslWcl: number
-    ckWcl: number
-    dsTjl: number
-    dsWcl: number
-    dsZfl: number
-    shouGen: number
-    houGen: number
-    tiaoJie: number
-    ja: number
-    zl: number
-    tjDate: string | null
-    maxTjTime: string | null
+    comName: string // 部门
+    userName: string // 人员姓名
+    userCode: string // 用户编码
+    groups: string // 小组
+    groupsCode: string | number // 小组编码
+    ckJsl: number // 查勘件数量
+    ckJslWcl: number // 查勘件未处理数量
+    ckWcl: number // 查勘未处理数量
+    dsTjl: number // 定损提交量
+    dsWcl: number // 定损未处理量
+    dsZfl: number // 定损支付量
+    shouGen: number // 首跟数量
+    houGen: number // 后跟数量
+    tiaoJie: number // 调解数量
+    ja: number // 结案数量
+    zl: number // 总工作量
+    tjDate: string | null // 统计日期
+    maxTjTime: string | null // 统计时间（用于标题展示）
   }
 
-  // 定义下拉选项类型（新增groupsCode字段用于排序）
-  interface GroupOption extends SelectOption {
-    groupsCode: string | number
-  }
+  /** 下拉框基础选项类型 */
   interface SelectOption {
     label: string
     value: string
   }
 
-  // 定义部门-小组映射类型（值为带groupsCode的小组选项）
+  /** 小组选项类型（扩展编码用于排序） */
+  interface GroupOption extends SelectOption {
+    groupsCode: string | number
+  }
+
+  /** 部门-小组级联映射 */
   interface DeptGroupMap {
     [deptName: string]: GroupOption[]
   }
 
-  // 定义 useTable 入参和返回值类型
+  /** 表格请求参数类型 */
   interface UseTableParams {
     current: number
     size: number
     [key: string]: any
   }
+
+  /** 表格接口返回结构 */
   interface UseTableResult<T> {
     records: T[]
     total: number
@@ -228,74 +201,77 @@
     size: number
   }
 
-  // 搜索表单 ref
+  // ==================== 2. 引用与状态变量 ====================
+  /** 搜索框实例引用 */
   const searchBarRef = ref<any>(null)
 
-  // 核心：缓存全量数据和映射关系
-  const allOriginData = ref<DailyWorkloadData[]>([]) // 全量原始数据
-  const fullComOptions = ref<SelectOption[]>([]) // 全量部门选项
-  const fullGroupOptions = ref<GroupOption[]>([]) // 全量小组选项（带编码）
-  const deptGroupMap = ref<DeptGroupMap>({}) // 部门-小组映射关系 { 部门名: [带编码的小组选项] }
+  /** 全量原始数据（用于构建部门/小组下拉） */
+  const allOriginData = ref<DailyWorkloadData[]>([])
 
-  // ✅ 新增：标记是否已完成初始化（彻底解决时序问题）
+  /** 全量部门选项 */
+  const fullComOptions = ref<SelectOption[]>([])
+
+  /** 全量小组选项（带编码） */
+  const fullGroupOptions = ref<GroupOption[]>([])
+
+  /** 部门 → 小组 级联映射关系 */
+  const deptGroupMap = ref<DeptGroupMap>({})
+
+  /** 标题展示的统计时间（动态更新） */
+  const currentMaxTjTime = ref<string>('')
+
+  /** 初始化完成标记（避免重复构建下拉数据） */
   const isInitialized = ref(false)
 
-  // 绑定到下拉框的动态选项
+  /** 页面级联选择器绑定数据 */
   const comOptions = ref<SelectOption[]>([])
-  const groupOptions = ref<SelectOption[]>([]) // 最终渲染的小组选项（仅label/value）
+  const groupOptions = ref<SelectOption[]>([])
 
-  // 校验规则
+  // ==================== 3. 搜索表单配置 ====================
+  /** 搜索表单校验规则 */
   const rules = {
     startDate: [{ required: false, message: '请选择开始日期', trigger: 'change' }],
     endDate: [{ required: false, message: '请选择结束日期', trigger: 'change' }]
   }
 
-  // 🌟 关键修改1：初始日期直接设为当天（不再为空）
-  const today = new Date().toISOString().split('T')[0] // 格式化当天日期为 YYYY-MM-DD
+  /** 获取当前日期（YYYY-MM-DD） */
+  const today = new Date().toISOString().split('T')[0]
+
+  /** 搜索表单绑定对象 */
   const searchFormState = ref({
-    startDate: today, // 初始化=当天
-    endDate: today, // 初始化=当天
+    startDate: today,
+    endDate: today,
     comName: '',
     groups: '',
     userName: ''
   })
 
-  // 动态更新的 api 参数
+  /** 表格接口请求参数 */
   const tableApiParams = ref({
     current: 1,
     size: 20,
-    ...searchFormState.value // 初始api参数也带当天日期
+    ...searchFormState.value
   })
 
-  // 搜索表单配置 - 动态绑定下拉选项
+  /** 动态搜索表单项 */
   const searchItems = computed(() => [
     {
       key: 'startDate',
       label: '开始日期',
       type: 'date',
-      props: {
-        placeholder: '选择开始日期',
-        valueFormat: 'YYYY-MM-DD'
-      }
+      props: { placeholder: '选择开始日期', valueFormat: 'YYYY-MM-DD' }
     },
     {
       key: 'endDate',
       label: '结束日期',
       type: 'date',
-      props: {
-        placeholder: '选择结束日期',
-        valueFormat: 'YYYY-MM-DD'
-      }
+      props: { placeholder: '选择结束日期', valueFormat: 'YYYY-MM-DD' }
     },
     {
       key: 'comName',
       label: '部门',
       type: 'select',
-      props: {
-        placeholder: '请选择部门',
-        options: comOptions.value,
-        clearable: true
-      }
+      props: { placeholder: '请选择部门', options: comOptions.value, clearable: true }
     },
     {
       key: 'groups',
@@ -305,41 +281,41 @@
         placeholder: '请选择小组',
         options: groupOptions.value,
         clearable: true,
-        disabled: !searchFormState.value.comName // 未选部门时，小组下拉框禁用
+        disabled: !searchFormState.value.comName
       }
     },
     {
       key: 'userName',
       label: '人员',
       type: 'input',
-      props: {
-        placeholder: '请输入人员名称'
-      }
+      props: { placeholder: '请输入人员名称' }
     }
   ])
 
-  // 表格配置
-  const tableConfig = ref({
-    height: '100%',
-    fixedHeight: false
-  })
-  const computedTableHeight = computed(() => {
-    return tableConfig.value.fixedHeight ? '500px' : ''
-  })
+  // ==================== 4. 表格样式与高度 ====================
+  const tableConfig = ref({ height: '100%', fixedHeight: false })
+  const computedTableHeight = computed(() => (tableConfig.value.fixedHeight ? '500px' : ''))
 
-  // 工具函数：按groupsCode升序排序小组选项
+  // ==================== 5. 工具函数 ====================
+  /**
+   * @description 按小组编码升序排序（兼容字符串/数字）
+   * @param groups 小组数组
+   */
   const sortGroupByCode = (groups: GroupOption[]) => {
     return groups.sort((a, b) => {
-      // 兼容数字/字符串编码排序（如 "001"、1、"02"）
       const codeA = typeof a.groupsCode === 'string' ? parseInt(a.groupsCode) || 0 : a.groupsCode
       const codeB = typeof b.groupsCode === 'string' ? parseInt(b.groupsCode) || 0 : b.groupsCode
       return codeA - codeB
     })
   }
 
-  // 核心：构建部门-小组映射关系 + 全量选项（带排序）
+  /**
+   * @description 从全量数据构建部门-小组级联关系
+   * @param data 原始数据
+   */
   const buildDeptGroupMap = (data: DailyWorkloadData[]) => {
-    if (fullComOptions.value.length > 0 && Object.keys(deptGroupMap.value).length > 0) return
+    // 已构建过则直接返回
+    if (fullComOptions.value.length && Object.keys(deptGroupMap.value).length) return
 
     const comSet = new Set<string>()
     const tempDeptGroupMap: DeptGroupMap = {}
@@ -347,16 +323,12 @@
     data.forEach((item) => {
       if (!item.comName || !item.groups || !item.groupsCode) return
 
-      // 收集部门
       comSet.add(item.comName)
 
-      // 构建部门-小组映射（带groupsCode）
-      if (!tempDeptGroupMap[item.comName]) {
-        tempDeptGroupMap[item.comName] = []
-      }
-      // 小组去重
-      const groupExists = tempDeptGroupMap[item.comName].some((g) => g.value === item.groups)
-      if (!groupExists) {
+      // 构建部门下的小组（去重）
+      if (!tempDeptGroupMap[item.comName]) tempDeptGroupMap[item.comName] = []
+      const exists = tempDeptGroupMap[item.comName].some((g) => g.value === item.groups)
+      if (!exists) {
         tempDeptGroupMap[item.comName].push({
           label: item.groups,
           value: item.groups,
@@ -365,28 +337,24 @@
       }
     })
 
-    // 缓存全量部门选项
+    // 保存部门列表
     fullComOptions.value = Array.from(comSet).map((name) => ({ label: name, value: name }))
     comOptions.value = [...fullComOptions.value]
 
-    // 缓存部门-小组映射（并按groupsCode排序）
+    // 小组按编码排序
     Object.keys(tempDeptGroupMap).forEach((dept) => {
       tempDeptGroupMap[dept] = sortGroupByCode(tempDeptGroupMap[dept])
     })
     deptGroupMap.value = tempDeptGroupMap
 
-    // 缓存全量小组选项（所有部门的小组合并去重 + 按编码排序）
+    // 全量小组列表
     const allGroups: GroupOption[] = []
-    Object.values(tempDeptGroupMap).forEach((groups) => {
-      groups.forEach((g) => {
-        if (!allGroups.some((ag) => ag.value === g.value)) {
-          allGroups.push(g)
-        }
+    Object.values(tempDeptGroupMap).forEach((gList) => {
+      gList.forEach((g) => {
+        if (!allGroups.some((item) => item.value === g.value)) allGroups.push(g)
       })
     })
     fullGroupOptions.value = sortGroupByCode(allGroups)
-
-    // 初始小组选项为空（未选部门时）
     groupOptions.value = []
 
     ElNotification({
@@ -396,26 +364,25 @@
     })
   }
 
-  // 核心：监听部门变化，动态更新小组选项（按编码排序）
+  // ==================== 6. 监听：部门切换 → 刷新小组列表 ====================
   watch(
     () => searchFormState.value.comName,
-    (newDept, oldDept) => {
+    (newDept) => {
       if (newDept) {
-        // 选中部门：显示该部门下的小组（已按编码排序），仅保留label/value
+        // 选中部门：展示对应小组
         const sortedGroups = deptGroupMap.value[newDept] || []
         groupOptions.value = sortedGroups.map((g) => ({ label: g.label, value: g.value }))
-        // 清空之前选中的小组
         searchFormState.value.groups = ''
       } else {
-        // 未选部门：清空小组选项，禁用小组下拉框
+        // 清空部门：清空小组
         groupOptions.value = []
         searchFormState.value.groups = ''
       }
     },
-    { immediate: true } // 初始化时执行一次
+    { immediate: true }
   )
 
-  // 使用 useTable hook
+  // ==================== 7. 表格核心 Hook ====================
   const {
     data: tableData,
     loading,
@@ -428,12 +395,13 @@
     columnChecks
   } = useTable({
     core: {
+      /** 表格数据请求接口 */
       apiFn: async (params: UseTableParams): Promise<UseTableResult<DailyWorkloadData>> => {
         const queryParams = {
           current: params.current,
           size: params.size,
-          startDate: tableApiParams.value.startDate ?? today, // 🌟 兜底为当天
-          endDate: tableApiParams.value.endDate ?? today, // 🌟 兜底为当天
+          startDate: tableApiParams.value.startDate ?? today,
+          endDate: tableApiParams.value.endDate ?? today,
           comName: tableApiParams.value.comName ?? '',
           groups: tableApiParams.value.groups ?? '',
           userName: tableApiParams.value.userName ?? ''
@@ -443,24 +411,27 @@
           params: queryParams
         })
 
-        // ✅ 彻底修复时序：只在【真正第一次加载】且【未初始化】时执行一次
-        if (
-          !isInitialized.value &&
-          response.data?.code === 200 &&
-          Array.isArray(response.data.data) &&
-          response.data.data.length > 0
-        ) {
+        // 首次加载：构建部门/小组下拉
+        if (!isInitialized.value && response.data?.code === 200 && response.data.data?.length) {
           allOriginData.value = [...response.data.data]
           buildDeptGroupMap(allOriginData.value)
-          isInitialized.value = true // 永久标记：已完成初始化
+          isInitialized.value = true
         }
 
-        // 处理表格数据分页
+        // 处理表格数据
         let tableResultData: DailyWorkloadData[] = []
         if (response.data?.code === 200 && Array.isArray(response.data.data)) {
-          tableResultData = response.data.data as DailyWorkloadData[]
+          tableResultData = response.data.data
+
+          // 动态更新标题统计时间
+          if (tableResultData.length) {
+            currentMaxTjTime.value = tableResultData[0].maxTjTime || ''
+          } else {
+            currentMaxTjTime.value = ''
+          }
         }
 
+        // 前端分页
         const start = (params.current - 1) * params.size
         const end = start + params.size
         return {
@@ -472,6 +443,7 @@
       },
       apiParams: tableApiParams.value,
       immediate: true,
+      /** 表格列配置 */
       columnsFactory: () => [
         {
           prop: 'comName',
@@ -501,8 +473,7 @@
         { prop: 'houGen', label: '后跟数量', width: 100, align: 'center', sortable: true },
         { prop: 'tiaoJie', label: '调解数量', width: 100, align: 'center', sortable: true },
         { prop: 'ja', label: '结案数量', width: 100, align: 'center', sortable: true },
-        { prop: 'zl', label: '总量', width: 100, align: 'center', sortable: true },
-        { prop: 'tjDate', label: '统计日期', width: 120, align: 'center', sortable: true }
+        { prop: 'zl', label: '总量', width: 100, align: 'center', sortable: true }
       ]
     },
     performance: {
@@ -513,52 +484,51 @@
     }
   })
 
-  // 表格实例引用
+  // ==================== 8. 表格事件（预留扩展） ====================
   const tableRef = ref<any>(null)
-
-  // 事件处理函数
   const handleSelectionChange = () => {}
   const handleRowClick = () => {}
   const handleHeaderClick = () => {}
   const handleSortChange = () => {}
 
-  // 手动刷新：重新加载全量数据
+  // ==================== 9. 页面操作方法 ====================
+  /**
+   * @description 手动刷新：重新拉取全量数据
+   */
   const handleRefresh = async () => {
     try {
       const res = await axios.get('http://localhost:8080/api/cur_gzl/list', {
         params: { current: 1, size: 9999 }
       })
-      if (res.data?.code === 200 && Array.isArray(res.data.data)) {
+      if (res.data?.code === 200 && res.data.data?.length) {
         allOriginData.value = [...res.data.data]
         buildDeptGroupMap(allOriginData.value)
+        currentMaxTjTime.value = res.data.data[0].maxTjTime || ''
       }
       refreshData()
-    } catch (err) {
-      console.error('刷新失败:', err)
+    } catch {
       refreshData()
     }
   }
 
+  /**
+   * @description 搜索按钮：提交查询条件
+   */
   const handleSearch = async () => {
     try {
       if (searchBarRef.value) await searchBarRef.value.validate()
-      tableApiParams.value = {
-        ...tableApiParams.value,
-        startDate: searchFormState.value.startDate,
-        endDate: searchFormState.value.endDate,
-        comName: searchFormState.value.comName,
-        groups: searchFormState.value.groups,
-        userName: searchFormState.value.userName
-      }
+      tableApiParams.value = { ...tableApiParams.value, ...searchFormState.value }
       refreshData()
       ElNotification({ title: '提示', message: '搜索成功', type: 'success' })
-    } catch (err) {
+    } catch {
       ElNotification({ title: '错误', message: '搜索条件校验失败', type: 'error' })
     }
   }
 
+  /**
+   * @description 重置查询条件：恢复默认日期
+   */
   const handleReset = () => {
-    // 🌟 关键修改2：重置后也恢复为当天日期（而非空）
     searchFormState.value = {
       startDate: today,
       endDate: today,
@@ -566,21 +536,21 @@
       groups: '',
       userName: ''
     }
-    tableApiParams.value = {
-      current: 1,
-      size: 20,
-      ...searchFormState.value
-    }
+    tableApiParams.value = { current: 1, size: 20, ...searchFormState.value }
     refreshData()
   }
 
-  // 导出功能
+  // ==================== 10. 导出功能 ====================
+  /**
+   * @description 导出当前页数据
+   */
   const handleExportCurrent = async () => {
     const data = tableData.value as DailyWorkloadData[]
     if (!data.length) {
       ElNotification({ title: '提示', message: '暂无数据可导出', type: 'warning' })
       return
     }
+
     const exportData = data.map((item, index) => ({
       序号: index + 1,
       部门: item.comName,
@@ -598,9 +568,9 @@
       后跟数量: item.houGen,
       调解数量: item.tiaoJie,
       结案数量: item.ja,
-      总量: item.zl,
-      统计日期: item.tjDate
+      总量: item.zl
     }))
+
     const ws = XLSX.utils.json_to_sheet(exportData)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '人员当日工作量统计')
@@ -609,6 +579,9 @@
     ElNotification({ title: '成功', message: '导出成功', type: 'success' })
   }
 
+  /**
+   * @description 导出全部数据
+   */
   const handleExportAll = async () => {
     try {
       const res = await axios.get('http://localhost:8080/api/cur_gzl/list', {
@@ -619,6 +592,7 @@
         ElNotification({ title: '提示', message: '暂无数据可导出', type: 'warning' })
         return
       }
+
       const exportData = data.map((item, index) => ({
         序号: index + 1,
         部门: item.comName,
@@ -636,36 +610,40 @@
         后跟数量: item.houGen,
         调解数量: item.tiaoJie,
         结案数量: item.ja,
-        总量: item.zl,
-        统计日期: item.tjDate
+        总量: item.zl
       }))
+
       const ws = XLSX.utils.json_to_sheet(exportData)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, '人员当日工作量统计')
       const fileName = `人员当日工作量统计_全部_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`
       XLSX.writeFile(wb, fileName)
       ElNotification({ title: '成功', message: `${data.length} 条数据导出成功`, type: 'success' })
-    } catch (err) {
+    } catch {
       ElNotification({ title: '错误', message: '导出失败', type: 'error' })
     }
   }
 
-  // 页面挂载后强制更新日期筛选器
+  // ==================== 11. 生命周期 ====================
   onMounted(async () => {
     await nextTick()
-    if (searchBarRef.value) {
-      searchBarRef.value.$forceUpdate?.()
-    }
+    // 强制刷新搜索栏避免视图不更新
+    if (searchBarRef.value) searchBarRef.value.$forceUpdate?.()
   })
 </script>
 
 <style scoped>
+  /* 自定义表头样式 */
   .custom-header:hover {
     color: var(--el-color-primary-light-3);
   }
+
+  /* 表格配置开关样式 */
   .demo-group .config-toggles .el-switch {
     --el-switch-on-color: var(--el-color-primary);
   }
+
+  /* 性能提示条样式 */
   .demo-group .performance-info .el-alert {
     --el-alert-padding: 12px;
   }
