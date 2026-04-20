@@ -197,7 +197,7 @@
   ])
 
   // ==================== 4. 表格样式 ====================
-  const tableConfig = ref({ height: '100%', fixedHeight: false })
+  const tableConfig = ref({ height: '100%', fixedHeight: true })
   const computedTableHeight = computed(() => (tableConfig.value.fixedHeight ? '500px' : ''))
 
   // ==================== 5. 构建部门下拉框 ====================

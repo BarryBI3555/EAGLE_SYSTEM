@@ -64,6 +64,7 @@
         :data="tableData"
         :columns="columns"
         :height="computedTableHeight"
+        :scrollbar-always-on="true"
         empty-height="360px"
         @selection-change="handleSelectionChange"
         @row-click="handleRowClick"
@@ -293,7 +294,7 @@
   ])
 
   // ==================== 4. 表格样式与高度 ====================
-  const tableConfig = ref({ height: '100%', fixedHeight: false })
+  const tableConfig = ref({ height: '100%', fixedHeight: true })
   const computedTableHeight = computed(() => (tableConfig.value.fixedHeight ? '500px' : ''))
 
   // ==================== 5. 工具函数 ====================

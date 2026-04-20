@@ -64,6 +64,7 @@
         :data="tableData"
         :columns="columns"
         :height="computedTableHeight"
+        :scrollbar-always-on="true"
         empty-height="360px"
         @selection-change="handleSelectionChange"
         @row-click="handleRowClick"
@@ -258,7 +259,7 @@
   ])
 
   // ==================== 4. 表格样式与高度 ====================
-  const tableConfig = ref({ height: '100%', fixedHeight: false })
+  const tableConfig = ref({ height: '100%', fixedHeight: true })
   const computedTableHeight = computed(() => (tableConfig.value.fixedHeight ? '500px' : ''))
 
   // ==================== 5. 工具函数 ====================
@@ -394,7 +395,7 @@
           fixed: 'left',
           sortable: true
         },
-        { prop: 'groups', label: '小组', width: 150, align: 'center', sortable: true },
+        { prop: 'groups', label: '小组', width: 150, align: 'center', sortable: true, fixed: 'left' },
         { prop: 'groupsCode', label: '小组编码', width: 140, align: 'center', sortable: true },
         { prop: 'ckJsl', label: '查勘件数量', width: 120, align: 'center', sortable: true },
         {
@@ -452,7 +453,7 @@
       if (searchBarRef.value) await searchBarRef.value.validate()
       tableApiParams.value = { ...tableApiParams.value, ...searchFormState.value }
       refreshData()
-      ElNotification({ title: '提示', message: '搜索成功', type: 'success' })
+      // ElNotification({ title: '提示', message: '搜索成功', type: 'success' })
     } catch {
       ElNotification({ title: '错误', message: '搜索条件校验失败', type: 'error' })
     }

@@ -39,6 +39,7 @@
   import AboutProject from './modules/about-project.vue'
 
   defineOptions({ name: 'Console' })
+
 </script>
 
 <style scoped>
