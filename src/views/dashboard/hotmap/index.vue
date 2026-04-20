@@ -1,7 +1,7 @@
 <!-- 人员路线地图页面 -->
 <template>
-  <h3>⭐敬请期待...</h3>
   <div class="map-page">
+    <h3>⭐敬请期待...</h3>
     <HotMap />
   </div>
 </template>
@@ -9,7 +9,7 @@
 <script setup lang="ts">
   import HotMap from './modules/hot-map.vue'
 
-  defineOptions({ name: 'Console' })
+  defineOptions({ name: 'HotMap' })
 </script>
 
 <style scoped>

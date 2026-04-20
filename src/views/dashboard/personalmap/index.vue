@@ -10,7 +10,7 @@
   import UserMap from './modules/user-map.vue'
   import { usePreload } from '@/hooks/core/usePreload'
 
-  defineOptions({ name: 'Console' })
+  defineOptions({ name: 'PersonalMap' })
 
 
   // 预加载table_cur_gzl_ry页面，减少打开table_cur_gzl_ry页面时的加载时间
