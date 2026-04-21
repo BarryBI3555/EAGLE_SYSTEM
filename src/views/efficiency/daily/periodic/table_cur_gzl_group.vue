@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col gap-4 pb-5">
+  <div class="flex flex-col gap-2 pb-3">
     <!-- 搜索条件区域 -->
     <ArtSearchBar
       ref="searchBarRef"
@@ -65,7 +65,7 @@
         :columns="columns"
         :height="computedTableHeight"
         :scrollbar-always-on="true"
-        empty-height="360px"
+        empty-height="560px"
         @selection-change="handleSelectionChange"
         @row-click="handleRowClick"
         @header-click="handleHeaderClick"
@@ -260,7 +260,7 @@
 
   // ==================== 4. 表格样式与高度 ====================
   const tableConfig = ref({ height: '100%', fixedHeight: true })
-  const computedTableHeight = computed(() => (tableConfig.value.fixedHeight ? '500px' : ''))
+  const computedTableHeight = computed(() => (tableConfig.value.fixedHeight ? '560px' : ''))
 
   // ==================== 5. 工具函数 ====================
   const sortGroupByCode = (groups: GroupOption[]) => {

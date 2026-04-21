@@ -5,6 +5,7 @@
       <div id="map-container" class="map-container"></div>
       <div v-if="loading" class="loading">地图加载中...</div>
       <div v-if="error" class="error">{{ error }}</div>
+      
     </div>
 
     <!-- 右侧面板容器 -->
@@ -19,6 +20,14 @@
               <h3 class="user-list-title">人员列表</h3>
               <!-- 返回主页按钮 -->
               <div class="district-and-home-btns">
+                <!-- 行政区划相关 -->
+                <img
+                  src="@/assets/images/icon/网格.png"
+                  class="home-img-btn"
+                  @click="toggleDistricts"
+                  title="显示/隐藏行政区划"
+                  position="left"
+                />
                 <img
                   src="@/assets/images/icon/Home.png"
                   class="home-img-btn"
@@ -26,14 +35,7 @@
                   title="返回主页"
                   position="right"
                 />
-                <!-- 行政区划相关 -->
-                <img
-                  src="@/assets/images/icon/SiGlyphMapSquare.png"
-                  class="home-img-btn"
-                  @click="toggleDistricts"
-                  title="显示/隐藏行政区划"
-                  position="left"
-                />
+                
               </div>
             </div>
             <!-- 第二行：日期选择器 + 片区下拉框 -->
@@ -184,7 +186,7 @@
 
 <script setup lang="ts">
   import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
-
+  import { AdministrativeRegionManager } from './AdministrativeRegionmanager'
   // 全局声明腾讯地图SDK和自定义属性，避免TS类型报错
   declare global {
     interface Window {
@@ -192,8 +194,12 @@
       districtLabelLayer?: any
     }
   }
-  // 腾讯地图api key
-  const ApiKey = 'KJ5BZ-2JC6Q-PGA5F-4DREW-YWBR6-TEB24'
+  
+  // 类型定义
+  type AdministrativeRegionManagerType = InstanceType<typeof AdministrativeRegionManager>
+  
+    // 腾讯地图api key
+  // const ApiKey = 'KJ5BZ-2JC6Q-PGA5F-4DREW-YWBR6-TEB24'
   // ==================== 地图实例与图层对象 ====================
   let map: any = null
   let markerLayer: any = null
@@ -204,7 +210,6 @@
   let tempMarker: any = null
   let infoWindow: any = null
   let currentTrackBounds: any = null
-  let districtLayer: any = null
   const currentTrackPadding = { top: 50, bottom: 50, left: 50, right: 50 }
 
   // ==================== 响应式状态 ====================
@@ -223,9 +228,7 @@
   const groupOptions = ref<any[]>([])
   const selectedGroupCode = ref<string>('')
 
-  //行政区划相关
-  const showingDistricts = ref(false)
-  const loadingDistricts = ref(false)
+
 
   // ==================== 日期处理 ====================
   const today = new Date()
@@ -254,6 +257,8 @@
       second: '2-digit'
     })
   }
+
+  
 
   // ==================== 地图初始化 ====================
   const initMap = async () => {
@@ -284,6 +289,9 @@
       if (rotationControl)
         rotationControl.setPosition(window.TMap.constants.CONTROL_POSITION.TOP_LEFT)
 
+      // 初始化行政区划管理器
+      administrativeRegionManager = new AdministrativeRegionManager(map)
+
       await fetchLatestLocations()
       await fetchGroupList()
       loading.value = false
@@ -293,6 +301,29 @@
       loading.value = false
     }
   }
+
+
+  // ==================== 行政区划功能 ====================
+  let administrativeRegionManager: AdministrativeRegionManager | null = null
+  
+  const toggleDistricts = () => {
+    if (administrativeRegionManager) {
+      administrativeRegionManager.toggleDistricts()
+    }
+  }
+  
+  const showDistricts = async () => {
+    if (administrativeRegionManager) {
+      await administrativeRegionManager.showDistricts()
+    }
+  }
+  
+  const hideDistricts = async () => {
+    if (administrativeRegionManager) {
+      await administrativeRegionManager.hideDistricts()
+    }
+  }
+
 
   // ==================== 获取片区列表 ====================
   const fetchGroupList = async () => {
@@ -404,303 +435,8 @@
     }
   }
 
-  // ==================== 行政区划功能 ====================
-const toggleDistricts = () => {
-  if (showingDistricts.value) {
-    hideDistricts()
-  } else {
-    showDistricts()
-  }
-}
-
-
-const showDistricts = async () => {
-  if (!map) {
-    console.error('地图未初始化');
-    showingDistricts.value = false;
-    return;
-  }
-
-  showingDistricts.value = true;
   
-  try {
-    // 获取当前地图中心点
-    const center = map.getCenter();
-    
-    // 通过后端代理获取地理位置信息
-    const geocoderUrl = `http://localhost:8080/api/map/geocoder?location=${center.lat},${center.lng}`;
-    
-    const geocodeResponse = await fetch(geocoderUrl);
-    const geocodeData = await geocodeResponse.json();
-    
-    if (geocodeData.status === 0) {
-      // 使用城市名称进行搜索
-      const addressComponent = geocodeData.result.address_component;
-      let areaName =  addressComponent.city
-      
-      const searchUrl = `http://localhost:8080/api/map/district/search?keyword=${encodeURIComponent(areaName)}`;
-      const searchResponse = await fetch(searchUrl);
-      const searchData = await searchResponse.json();
-      
-      let adcode = null;
-      if (searchData.status === 0 && searchData.result && Array.isArray(searchData.result)) {
-        // 尝试从结果中找到合适的地区ID
-        if (searchData.result.length > 0) {
-          // 寻找最匹配的结果，增加安全检查防止undefined错误
-          const matchedResult = searchData.result.find(item => 
-            item && 
-            Array.isArray(item) && 
-            item[0] && 
-            item[0].title && 
-            typeof item[0].title === 'string' &&
-            typeof areaName === 'string' &&
-            (item[0].title.includes(areaName) || areaName.includes(item[0].title))
-          );
-          
-          if (matchedResult && matchedResult[0]) {
-            adcode = matchedResult[0].id;
-          } else {
-            // 如果没找到精确匹配，使用第一个结果
-            adcode = searchData.result[0][0]?.id;
-          }
-        }
-      }
-      
-      if (!adcode) {
-        console.error('未能获取到有效的地区ID', searchData);
-        showingDistricts.value = false;
-        return;
-      }
-      
-      // console.log('获取到的地区ID:', adcode);
 
-      // 通过后端代理获取下级行政区划
-      const childrenUrl = `http://localhost:8080/api/map/district/getchildren?id=${adcode}`;
-      const childrenResponse = await fetch(childrenUrl);
-      const childrenData = await childrenResponse.json();
-      
-      if (childrenData.status === 0 && childrenData.result) {
-        // 直接传递整个result数组给drawDistricts
-        await drawDistricts(childrenData.result);
-        showingDistricts.value = true;
-      } else {
-        console.error('获取下级行政区划数据失败:', childrenData.message);
-        showingDistricts.value = false;
-      }
-    } else {
-      console.error('获取地理位置信息失败:', geocodeData.message);
-        showingDistricts.value = false;
-    }
-  } catch (error) {
-    console.error('获取行政区划数据出错:', error);
-    showingDistricts.value = false;
-  } finally {
-    // 确保无论成功还是失败都重置加载状态
-    loadingDistricts.value = false;
-  }
-};
-
-const hideDistricts = async () => {
-  if (districtLayer) {
-    districtLayer.setMap(null);
-    districtLayer = null;
-  }
-  
-  // 同时隐藏标签图层
-  // if (window['districtLabelLayer']) {
-  //   window['districtLabelLayer'].setMap(null);
-  //   window['districtLabelLayer'] = null;
-  // }
-  
-  showingDistricts.value = false;
-  loadingDistricts.value = false; // 确保加载状态也被重置
-  
-  // 返回一个Promise以确保调用方可以await
-  return Promise.resolve();
-};
-
-const drawDistricts = async (districts) => {
-    if (!districts) return;
-    
-    // console.log('开始绘制行政区划，输入数据:', districts); // 调试日志
-    
-    // 清除现有的行政区划图层
-    await hideDistricts();
-    
-    const polygons = [];
-    
-    // 递归处理行政区划数据
-    const processDistricts = (data) => {
-      if (!data) return;
-      
-      // 检查是否是二维数组结构 [[{...}, {...}]]
-      if (Array.isArray(data) && data.length > 0 && Array.isArray(data[0])) {
-        // 二维数组，遍历内部数组
-        data.forEach(innerArray => {
-          if (Array.isArray(innerArray)) {
-            innerArray.forEach(district => {
-              addDistrictPolygon(district);
-            });
-          }
-        });
-      } else if (Array.isArray(data)) {
-        // 一维数组，直接遍历
-        data.forEach(district => {
-          addDistrictPolygon(district);
-        });
-      } else if (typeof data === 'object') {
-        // 单个对象
-        addDistrictPolygon(data);
-      }
-    };
-    
-    const addDistrictPolygon = (district) => {
-      if (!district || !district.polygon) {
-        console.warn('跳过无效的区划数据:', district);
-        return;
-      }
-      
-      // console.log('处理区划:', district.fullname || district.id); // 调试日志
-      
-      // district.polygon 是一个二维数组 [[lng, lat, lng, lat, ...]]
-      if (Array.isArray(district.polygon)) {
-        district.polygon.forEach((polygonRing, ringIndex) => {
-          if (!Array.isArray(polygonRing) || polygonRing.length < 6) { // 至少3个点（6个坐标值）
-            console.warn('跳过无效的多边形环:', polygonRing);
-            return;
-          }
-          
-          // 将一维坐标数组转换为经纬度对 [[lat, lng], [lat, lng], ...]
-          const paths = [];
-          // polygonRing 格式是 [lng, lat, lng, lat, ...]
-          for (let i = 0; i < polygonRing.length; i += 2) {
-            if (i + 1 < polygonRing.length) {
-              const lng = polygonRing[i];
-              const lat = polygonRing[i + 1];
-              paths.push(new window.TMap.LatLng(lat, lng));
-            }
-          }
-          
-          if (paths.length >= 3) { // 至少需要3个点才能构成一个多边形
-            polygons.push({
-              id: `${district.id || 'district'}_${ringIndex}`,
-              styleId: 'districtFill',
-              paths: [paths],
-              properties: {
-                name: district.fullname || district.name || district.title || '未知区域',
-                id: district.id
-              }
-            });
-            
-            // console.log(`添加了区划 ${district.fullname || district.id} 的第${ringIndex + 1}个多边形环，包含${paths.length}个点`); // 调试日志
-          } else {
-            console.warn(`区划 ${district.fullname || district.id} 的多边形环点数不足:`, paths.length);
-          }
-        });
-      }
-      
-      // 递归处理子区划
-      if (district.districts) {
-        processDistricts(district.districts);
-      }
-    };
-    
-    // 开始处理传入的数据
-    processDistricts(districts);
-    
-    // console.log('准备绘制的多边形数量:', polygons.length); // 调试日志
-    
-    // 创建行政区划图层
-    if (polygons.length > 0) {
-      // console.log('创建行政区划图层，包含', polygons.length, '个区划');
-      
-      districtLayer = new window.TMap.MultiPolygon({
-        map: map,
-        styles: {
-          districtFill: new window.TMap.PolygonStyle({
-            color: 'rgba(0,100,150,0.2)', // 半透明蓝色填充
-            strokeColor: '#006096', // 边框颜色
-            strokeWidth: 2, // 边框宽度
-            strokeStyle: 'solid' // 边框样式
-          })
-        },
-        geometries: polygons
-      });
-      
-      // // 计算每个区域的中心点并添加标签
-      // const labels = [];
-      // polygons.forEach(polygon => {
-      //   if (polygon.paths && polygon.paths[0] && polygon.paths[0].length > 0) {
-      //     // 计算多边形的中心点
-      //     const points = polygon.paths[0];
-      //     let sumLat = 0;
-      //     let sumLng = 0;
-          
-      //     points.forEach(point => {
-      //       sumLat += point.lat;
-      //       sumLng += point.lng;
-      //     });
-          
-      //     const centerLat = sumLat / points.length;
-      //     const centerLng = sumLng / points.length;
-          
-      //     // 添加标签
-      //     labels.push({
-      //       id: `label_${polygon.id}`,
-      //       styleId: 'districtLabel',
-      //       position: new window.TMap.LatLng(centerLat, centerLng),
-      //       content: polygon.properties.name || '未知区域',
-      //       properties: {
-      //         name: polygon.properties.name || '未知区域'
-      //       }
-      //     });
-      //   }
-      // });
-      
-      // // 创建标签图层
-      // if (labels.length > 0) {
-      //   const labelLayer = new window.TMap.MultiLabel({
-      //     map: map,
-      //     styles: {
-      //       districtLabel: new window.TMap.LabelStyle({
-      //         color: '#ffffff',
-      //         backgroundColor: 'rgba(0, 0, 0, 0.6)',
-      //         fontSize: 12,
-      //         borderColor: '#ffffff',
-      //         borderWidth: 1,
-      //         borderRadius: 4,
-      //         padding: '2px 6px',
-      //         zIndex: 1000,
-      //         offset: { x: 0, y: 0 }
-      //       })
-      //     },
-      //     geometries: labels
-      //   });
-        
-      //   // 将标签图层存储为全局变量以便后续管理
-      //   window['districtLabelLayer'] = labelLayer;
-      // }
-      
-      // 调整地图视图以适应所有行政区划
-      // if (map && polygons.length > 0) {
-      //   const bounds = new window.TMap.LatLngBounds();
-      //   polygons.forEach(polygon => {
-      //     polygon.paths[0].forEach(point => {
-      //       bounds.extend(point);
-      //     });
-      //   });
-        
-      //   if (!bounds.isEmpty()) {
-      //     map.fitBounds(bounds, { padding: { top: 50, bottom: 50, left: 50, right: 50 } });
-      //   }
-        
-      // }
-      showingDistricts.value = true;
-    } else {
-      console.warn('没有找到有效的行政区划数据用于绘制');
-      showingDistricts.value = false;
-    }
-  };
 
 
 
@@ -1034,13 +770,16 @@ const drawDistricts = async (districts) => {
     max-width: 225px;
   }
   .home-img-btn {
-    width: 26px;
-    height: 26px;
+    width: 25px;
+    height: 25px;
     cursor: pointer;
     transition: all 0.25s ease;
     opacity: 0.85;
     filter: brightness(0) invert(1);
     flex-shrink: 0;
+    border: 1px solid #9ca3af; /* 添加边框 */
+    border-radius: 4px; /* 可选：添加圆角 */
+    padding: 4px; /* 可选：添加内边距 */
   }
   .home-img-btn:hover {
     opacity: 1;
@@ -1069,6 +808,7 @@ const drawDistricts = async (districts) => {
     height: 100%;
     background: #111827;
   }
+ 
   .map-content {
     flex: 1;
     height: 100%;
@@ -1333,6 +1073,60 @@ const drawDistricts = async (districts) => {
       height: auto;
       max-height: 280px;
     }
+  }
+  
+  /* 地图控件样式 */
+  .map-control-top-right {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .map-control-btn {
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    background: white;
+    border-radius: 4px;
+    padding: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    z-index: 1000;
+  }
+  
+  .map-control-btn:hover {
+    background: #f5f5f5;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  @media (max-width: 768px) {
+    .map-control-top-right {
+      top: 8px;
+      right: 8px;
+    }
+  }
+
+  @reference '@styles/core/tailwind.css';
+
+  .art-button {
+    @apply ml-2 
+    size-8 
+    flex 
+    items-center 
+    justify-center 
+    cursor-pointer 
+    rounded-md 
+    bg-g-300/55
+    dark:bg-g-300/40
+    text-g-700  
+    hover:bg-g-300 
+    md:ml-0 
+    md:mr-2.5;
   }
 </style>
 
