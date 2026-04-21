@@ -17,7 +17,8 @@ export const dashboardRoutes: AppRouteRecord = {
       meta: {
         title: 'menus.dashboard.personalmap',
         keepAlive: false,
-        fixedTab: true
+        fixedTab: true,
+        roles: ['R_SUPER', 'R_ADMIN']
       }
     },
     {

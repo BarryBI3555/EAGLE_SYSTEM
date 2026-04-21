@@ -1,3 +1,4 @@
+<!-- 登录页面 -->
 <template>
   <div class="flex w-full h-screen">
     <LoginLeftView />
@@ -17,6 +18,18 @@
             @keyup.enter="handleSubmit"
             style="margin-top: 25px"
           >
+            <ElFormItem prop="account">
+              <ElSelect v-model="formData.account" @change="setupAccount">
+                <ElOption
+                  v-for="account in accounts"
+                  :key="account.key"
+                  :label="account.label"
+                  :value="account.key"
+                >
+                  <span>{{ account.label }}</span>
+                </ElOption>
+              </ElSelect>
+            </ElFormItem>
             <ElFormItem prop="username">
               <ElInput
                 class="custom-height"
@@ -115,6 +128,40 @@
     formKey.value++
   })
 
+  type AccountKey = 'super' | 'admin' | 'user'
+
+  export interface Account {
+    key: AccountKey
+    label: string
+    userName: string
+    password: string
+    roles: string[]
+  }
+
+  const accounts = computed<Account[]>(() => [
+    {
+      key: 'super',
+      label: t('login.roles.super'),
+      userName: 'Super',
+      password: '123456',
+      roles: ['R_SUPER']
+    },
+    {
+      key: 'admin',
+      label: t('login.roles.admin'),
+      userName: 'Admin',
+      password: '123456',
+      roles: ['R_ADMIN']
+    },
+    {
+      key: 'user',
+      label: t('login.roles.user'),
+      userName: 'User',
+      password: '123456',
+      roles: ['R_USER']
+    }
+  ])
+
   const dragVerify = ref()
 
   const userStore = useUserStore()
@@ -127,6 +174,7 @@
   const formRef = ref<FormInstance>()
 
   const formData = reactive({
+    account: '',
     username: '',
     password: '',
     rememberPassword: true
@@ -139,11 +187,16 @@
 
   const loading = ref(false)
 
-  // 预设的固定账号密码
-  const FIXED_ACCOUNTS = {
-    'piccadmin': { password: 'piccadmin', role: 'admin', roles: ['R_ADMIN'] },
-    'piccuser': { password: 'piccuser', role: 'user', roles: ['R_USER'] },
-    'piccsuper': { password: 'piccsuper', role: 'super', roles: ['R_SUPER'] }
+  onMounted(() => {
+    setupAccount('super')
+  })
+
+  // 设置账号
+  const setupAccount = (key: AccountKey) => {
+    const selectedAccount = accounts.value.find((account: Account) => account.key === key)
+    formData.account = key
+    formData.username = selectedAccount?.userName ?? ''
+    formData.password = selectedAccount?.password ?? ''
   }
 
   // 登录
@@ -163,18 +216,20 @@
 
       loading.value = true
 
+      
+
+
+      // 登录请求
       const { username, password } = formData
 
-      // 检查是否为预设账号
-      const accountInfo = FIXED_ACCOUNTS[username]
-      if (!accountInfo || accountInfo.password !== password) {
-        ElMessage.error('用户名或密码错误')
-        return
+      // const { token, refreshToken } = await fetchLogin({
+      //   userName: username,
+      //   password: password,
+      // })
+      const { token, refreshToken } = {
+            "token": "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiU3VwZXIiLCJhZG1pbiI6dHJ1ZSwicm9sZSI6InN1cGVyIn0.__17_NN_-2__9ASM7_2-HM_0X3T2qE_S__B__0_8_27N__D7H__u8k0_-QS-0-_3_-__G-M__-tdF-_5m9_7_9",
+            "refreshToken": "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiU3VwZXIiLCJhZG1pbiI6dHJ1ZSwicm9sZSI6InN1cGVyIn0.7jF-r89_R-PZ____6--G_-OV02_-9_-P8-1w6k8_F_F_-O-_jZ__m7q__Eb7-rZ-_865Rj45_E-l1-5BN-__36"
       }
-
-      // 生成模拟token和用户信息
-      const token = generateMockToken(username, accountInfo.role)
-      const refreshToken = generateMockRefreshToken(username, accountInfo.role)
 
       // 验证token
       if (!token) {
@@ -182,13 +237,8 @@
       }
 
       // 存储 token 和登录状态
-      userStore.setToken(token, refreshToken)
-      userStore.setUserInfo({
-        username: username,
-        role: accountInfo.role,
-        roles: accountInfo.roles
-      })
-      userStore.setLoginStatus(true)
+      // userStore.setToken(token, refreshToken)
+      // userStore.setLoginStatus(true)
 
       // 登录成功处理
       showLoginSuccessNotice()
@@ -202,28 +252,13 @@
         // console.log(error.code)
       } else {
         // 处理非 HttpError
-        ElMessage.error('登录失败，请稍后重试')
+        // ElMessage.error('登录失败，请稍后重试')
         console.error('[Login] Unexpected error:', error)
       }
     } finally {
       loading.value = false
       resetDragVerify()
     }
-  }
-
-  // 生成模拟token
-  const generateMockToken = (username: string, role: string) => {
-    const payload = {
-      name: username,
-      role: role,
-      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24小时后过期
-    }
-    return `mock_token_${username}_${role}_${Date.now()}`
-  }
-
-  // 生成模拟刷新token
-  const generateMockRefreshToken = (username: string, role: string) => {
-    return `mock_refresh_token_${username}_${role}_${Date.now()}`
   }
 
   // 重置拖拽验证

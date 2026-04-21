@@ -75,6 +75,7 @@
             background: getMenuTheme.background
           }"
         >
+      
           <ArtLogo v-if="!isDualMenu" class="logo" />
 
           <p
@@ -85,7 +86,22 @@
             }"
           >
             {{ AppConfig.systemInfo.name }}
+            
+
           </p>
+          
+          
+          </div>
+          
+          
+        
+        <div v-if="!isDualMenu" class="date-time-container" :style="{ opacity: !menuOpen ? 0 : 1 }">
+            <div class="date-text">
+              {{ currentDate }}
+            </div>
+            <div class="time-text">
+              {{ currentTime }}
+            </div>      
         </div>
 
         <ElMenu
@@ -332,6 +348,25 @@
       }
     }
   })
+
+// <=======================================新增时间日期==============================================>
+  // 添加响应式数据
+const currentTime = ref('')
+const currentDate = ref('')
+
+// 更新时间和日期的函数
+const updateTime = () => {
+  const now = new Date()
+  currentTime.value = now.toLocaleTimeString('zh-CN', { hour12: false }) // 例如: "14:30:25"
+  currentDate.value = now.toLocaleDateString('zh-CN') // 例如: "2024年3月12日"
+}
+
+// 在组件挂载时初始化时间和日期
+onMounted(() => {
+  updateTime()
+  // 每秒更新一次时间
+  setInterval(updateTime, 1000)
+})
 </script>
 
 <style lang="scss" scoped>
@@ -352,4 +387,33 @@
       width: v-bind(menuclosewidth);
     }
   }
+
+  // <=======================================新增时间日期==============================================>
+
+.date-time-container {
+  position: absolute;
+  top: 8px; /* 与.logo的margin-top: 12px对齐 */
+  right: 15px; /* 调整右侧间距 */
+  left: auto;
+  transform: none;
+  flex-direction: column;
+  align-items: flex-end; /* 文字右对齐 */
+  font-size: 0.60rem; /* 缩小字体 */
+  margin-top: 0;
+  margin-bottom: 0;
+  height: 40px; /* 与logo区域高度保持一致 */
+  display: flex;
+  justify-content: center;
+  z-index: 10; /* 确保显示在合适层级 */
+}
+
+.time-text, .date-text {
+  display: flex;
+  justify-content: flex-end; /* 右对齐 */
+  width: 100%; /* 占据全部宽度 */
+  min-width: 80px; /* 设置最小宽度以保证统一 */
+  color: #9b9b9b; /* 设置更深的颜色 */
+  margin: 1px 0;
+  text-align: right; /* 文本右对齐 */
+}
 </style>

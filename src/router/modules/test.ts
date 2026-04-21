@@ -13,7 +13,7 @@ export const testRoutes: AppRouteRecord = {
         {
             path: 'test1',
             name: 'test1',
-            component: '/test/test1',
+            component: '/test/test_index',
             meta: {
                 title: 'menus.test.user',
                 isHide: false,

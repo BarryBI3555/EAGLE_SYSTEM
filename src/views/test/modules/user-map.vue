@@ -5,7 +5,6 @@
       <div id="map-container" class="map-container"></div>
       <div v-if="loading" class="loading">地图加载中...</div>
       <div v-if="error" class="error">{{ error }}</div>
-      
     </div>
 
     <!-- 右侧面板容器 -->
@@ -15,28 +14,17 @@
         <!-- 列表模式 -->
         <div v-if="!showDetailMode" class="list-mode">
           <div class="user-list-fixed">
-            <!-- 第一行：标题 + 返回主页 + 行政区划-->
+            <!-- 第一行：标题 + 日期 + 返回主页 -->
             <div class="top-title-row">
               <h3 class="user-list-title">人员列表</h3>
-              <!-- 返回主页按钮 -->
-              <div class="district-and-home-btns">
-                <!-- 行政区划相关 -->
-                <img
-                  src="@/assets/images/icon/网格.png"
-                  class="home-img-btn"
-                  @click="toggleDistricts"
-                  title="显示/隐藏行政区划"
-                  position="left"
-                />
-                <img
-                  src="@/assets/images/icon/Home.png"
-                  class="home-img-btn"
-                  @click="goToHomePage"
-                  title="返回主页"
-                  position="right"
-                />
-                
-              </div>
+
+              <img
+                src="@/assets/images/icon/Home.png"
+                class="home-img-btn"
+                @click="goToHomePage"
+                title="返回主页"
+                position="right"
+              />
             </div>
             <!-- 第二行：日期选择器 + 片区下拉框 -->
             <div class="search-date-row" style="margin-top: 10px">
@@ -186,20 +174,14 @@
 
 <script setup lang="ts">
   import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
-  import { AdministrativeRegionManager } from './AdministrativeRegionmanager'
-  // 全局声明腾讯地图SDK和自定义属性，避免TS类型报错
+
+  // 全局声明腾讯地图SDK，避免TS类型报错
   declare global {
     interface Window {
       TMap: any
-      districtLabelLayer?: any
     }
   }
-  
-  // 类型定义
-  type AdministrativeRegionManagerType = InstanceType<typeof AdministrativeRegionManager>
-  
-    // 腾讯地图api key
-  // const ApiKey = 'KJ5BZ-2JC6Q-PGA5F-4DREW-YWBR6-TEB24'
+
   // ==================== 地图实例与图层对象 ====================
   let map: any = null
   let markerLayer: any = null
@@ -228,8 +210,6 @@
   const groupOptions = ref<any[]>([])
   const selectedGroupCode = ref<string>('')
 
-
-
   // ==================== 日期处理 ====================
   const today = new Date()
   const formatDate = (date: Date) => {
@@ -257,8 +237,6 @@
       second: '2-digit'
     })
   }
-
-  
 
   // ==================== 地图初始化 ====================
   const initMap = async () => {
@@ -289,9 +267,6 @@
       if (rotationControl)
         rotationControl.setPosition(window.TMap.constants.CONTROL_POSITION.TOP_LEFT)
 
-      // 初始化行政区划管理器
-      administrativeRegionManager = new AdministrativeRegionManager(map)
-
       await fetchLatestLocations()
       await fetchGroupList()
       loading.value = false
@@ -301,29 +276,6 @@
       loading.value = false
     }
   }
-
-
-  // ==================== 行政区划功能 ====================
-  let administrativeRegionManager: AdministrativeRegionManager | null = null
-  
-  const toggleDistricts = () => {
-    if (administrativeRegionManager) {
-      administrativeRegionManager.toggleDistricts()
-    }
-  }
-  
-  const showDistricts = async () => {
-    if (administrativeRegionManager) {
-      await administrativeRegionManager.showDistricts()
-    }
-  }
-  
-  const hideDistricts = async () => {
-    if (administrativeRegionManager) {
-      await administrativeRegionManager.hideDistricts()
-    }
-  }
-
 
   // ==================== 获取片区列表 ====================
   const fetchGroupList = async () => {
@@ -434,11 +386,6 @@
       error.value = '后端接口异常：' + err.message
     }
   }
-
-  
-
-
-
 
   // 筛选按钮
   const filterUsers = async () => {
@@ -770,26 +717,17 @@
     max-width: 225px;
   }
   .home-img-btn {
-    width: 25px;
-    height: 25px;
+    width: 26px;
+    height: 26px;
     cursor: pointer;
     transition: all 0.25s ease;
     opacity: 0.85;
     filter: brightness(0) invert(1);
     flex-shrink: 0;
-    border: 1px solid #9ca3af; /* 添加边框 */
-    border-radius: 4px; /* 可选：添加圆角 */
-    padding: 4px; /* 可选：添加内边距 */
   }
   .home-img-btn:hover {
     opacity: 1;
     transform: scale(1.08);
-  }
-
-  .district-and-home-btns {
-    display: flex;
-    gap: 4px; /* 小间隙确保按钮紧贴 */
-    align-items: center;
   }
 
   .search-date-row {
@@ -804,14 +742,14 @@
 
   .user-map-container {
     display: flex;
+    /* flex-direction: column; 修改为垂直布局以适配上下排列 */
     width: 100%;
     height: 100%;
     background: #111827;
   }
- 
   .map-content {
     flex: 1;
-    height: 100%;
+    height: 75vh;
     position: relative;
     border-radius: 12px;
     overflow: hidden;
@@ -819,19 +757,35 @@
   }
   .map-container {
     width: 100%;
-    height: 100%;
+    height: 75vh;
   }
   .sidebar-container {
     position: relative;
-    height: 100%;
+    height: auto; /* 改为自动高度 */
+    /* max-height: 300px; 设置最大高度 */
     flex-shrink: 0;
+    overflow-y: auto;    /* 添加垂直滚动条，内容超出时显示 */
+    overflow-x: hidden;
+    margin-bottom: 10px; /* 为下方留出空间 */
+  }
+  /* 在水平布局时恢复原样式 */
+  @media (min-width: 1025px) {
+    .user-map-container:not(.vertical-layout) {
+      flex-direction: row;
+    }
+    .user-map-container:not(.vertical-layout) .sidebar-container {
+      height: 75vh;
+      max-height: none;
+      margin-bottom: 0;
+    }
   }
   .user-list {
-    width: 340px;
-    height: 100%;
+    width: 100%;
+    height: 75vh;
+    /* max-height: 300px; 限制最大高度 */
     background: #1f2937;
     border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    /* box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); */
     padding: 20px;
     display: flex;
     flex-direction: column;
@@ -1073,60 +1027,6 @@
       height: auto;
       max-height: 280px;
     }
-  }
-  
-  /* 地图控件样式 */
-  .map-control-top-right {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  .map-control-btn {
-    width: 32px;
-    height: 32px;
-    cursor: pointer;
-    background: white;
-    border-radius: 4px;
-    padding: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    transition: all 0.3s ease;
-    z-index: 1000;
-  }
-  
-  .map-control-btn:hover {
-    background: #f5f5f5;
-    transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  }
-  
-  @media (max-width: 768px) {
-    .map-control-top-right {
-      top: 8px;
-      right: 8px;
-    }
-  }
-
-  @reference '@styles/core/tailwind.css';
-
-  .art-button {
-    @apply ml-2 
-    size-8 
-    flex 
-    items-center 
-    justify-center 
-    cursor-pointer 
-    rounded-md 
-    bg-g-300/55
-    dark:bg-g-300/40
-    text-g-700  
-    hover:bg-g-300 
-    md:ml-0 
-    md:mr-2.5;
   }
 </style>
 
