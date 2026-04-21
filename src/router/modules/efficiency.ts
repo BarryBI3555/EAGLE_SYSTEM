@@ -10,16 +10,16 @@ export const efficiencyRoutes: AppRouteRecord = {
     roles: ['R_SUPER', 'R_ADMIN']
   },
   children: [
-    // 运营效率
-    {
-      path: 'personnel',
-      name: 'Personnel',
-      component: '/dashboard/personnel',
-      meta: {
-        title: 'menus.efficiency.personnel',
-        keepAlive: false
-      }
-    },
+    // // 运营效率
+    // {
+    //   path: 'personnel',
+    //   name: 'Personnel',
+    //   component: '/dashboard/personnel',
+    //   meta: {
+    //     title: 'menus.efficiency.personnel',
+    //     keepAlive: false
+    //   }
+    // },
     // 日常通报
     {
       path: 'daily',

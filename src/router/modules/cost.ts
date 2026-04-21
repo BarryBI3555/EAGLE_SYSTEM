@@ -13,7 +13,7 @@ export const costRoutes: AppRouteRecord = {
     {
       path: 'index',
       name: 'CostIndex',
-      component: '/dashboard/personnel',
+      component: '/test/test_index',
       meta: {
         title: 'menus.cost.title',
         keepAlive: false

@@ -13,7 +13,7 @@ export const managementRoutes: AppRouteRecord = {
     {
       path: 'index',
       name: 'ManagementIndex',
-      component: '/dashboard/personnel',
+      component: '/test/test_index',
       meta: {
         title: 'menus.management.title',
         keepAlive: false

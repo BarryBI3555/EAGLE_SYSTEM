@@ -11,13 +11,15 @@
 <script setup lang="ts">
   import { onMounted, onBeforeUnmount, ref } from 'vue'
 
+  // 全局类型声明
   declare global {
     interface Window {
       TMap: any
+      heatData: any[]
     }
   }
 
-  // 实例
+  // 地图实例
   let map: any = null
   let heat: any = null
 
@@ -25,9 +27,21 @@
   const loading = ref(true)
   const error = ref('')
 
+  // ==================== 动态加载官方热力数据（你要的Promise方式） ====================
+  const loadHeatDataScript = () => {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src = 'https://mapapi.qq.com/web/lbs/visualizationApi/demo/data/heat.js'
+      script.onload = resolve
+      script.onerror = reject
+      document.body.appendChild(script)
+    })
+  }
+
   // ==================== 初始化地图 ====================
   const initMap = async () => {
     try {
+      // 等待 TMap 加载（你已在index.html引入）
       let attempts = 0
       while (!window.TMap && attempts < 100) {
         await new Promise((resolve) => setTimeout(resolve, 100))
@@ -35,14 +49,20 @@
       }
       if (!window.TMap) throw new Error('腾讯地图加载失败')
 
+      // 动态加载热力数据
+      await loadHeatDataScript()
+
       const container = document.getElementById('heat-map-container')
       if (!container) return
 
+      // 官网中心点（北京）
+      const center = new window.TMap.LatLng(39.909897147274364, 116.39756310116866)
+
       // 创建地图
       map = new window.TMap.Map(container, {
-        center: new window.TMap.LatLng(30.6799, 104.0571), // 成都
         zoom: 12,
         pitch: 45,
+        center: center,
         mapStyleId: 'style1',
         baseMap: {
           type: 'vector',
@@ -50,19 +70,8 @@
         }
       })
 
-      // 设置地图控件位置到左上角
-      let zoomControl = map.getControl(window.TMap.constants.DEFAULT_CONTROL_ID.ZOOM)
-      let rotationControl = map.getControl(window.TMap.constants.DEFAULT_CONTROL_ID.ROTATION)
-      if (zoomControl) {
-        zoomControl.setPosition(window.TMap.constants.CONTROL_POSITION.TOP_LEFT)
-      }
-      if (rotationControl) {
-        rotationControl.setPosition(window.TMap.constants.CONTROL_POSITION.TOP_LEFT)
-      }
-
       // 初始化热力图
       initHeatMap()
-
       loading.value = false
     } catch (err: any) {
       error.value = '地图加载失败：' + err.message
@@ -70,49 +79,17 @@
     }
   }
 
-  // ==================== 初始化热力图 ====================
+  // ==================== 初始化3D热力图 ====================
   const initHeatMap = () => {
     heat = new window.TMap.visualization.Heat({
       max: 180,
       min: 0,
       height: 40,
-      radius: 30,
-      transitAnimation: { duration: 1500 }
+      radius: 30
     }).addTo(map)
 
-    // —————— 这里放你的最终案件数据 ——————
-    const yourCaseData = [
-      { lat: 30.6799, lng: 104.0571, count: 10 },
-      { lat: 30.6799, lng: 104.0571, count: 20 },
-      { lat: 30.6799, lng: 104.39, count: 5 }
-    ]
-
-    // 执行从0涨到最终值动画
-    startHeatGrowAnimation(yourCaseData)
-  }
-
-  // ==================== 热力从0增长动画（你要的核心功能） ====================
-  const startHeatGrowAnimation = (finalData: any[]) => {
-    let progress = 0
-    const totalSteps = 50
-    const interval = 30
-
-    const timer = setInterval(() => {
-      progress++
-      if (progress >= totalSteps) {
-        clearInterval(timer)
-        heat.setData(finalData)
-        return
-      }
-
-      const currentData = finalData.map((item) => ({
-        lat: item.lat,
-        lng: item.lng,
-        count: item.count * (progress / totalSteps)
-      }))
-
-      heat.setData(currentData)
-    }, interval)
+    // 设置官网热力数据
+    heat.setData(window.heatData)
   }
 
   // ==================== 生命周期 ====================
