@@ -184,10 +184,19 @@
   border-radius: calc(var(--custom-radius) / 2 + 2px) !important;
 
   .el-card__body {
-    height: 100%;
+    flex: 1;
+    height: 0;
     overflow: hidden;
+    padding: 10px !important;
+  }
+  .el-card__header {
+    padding-top: 8px !important;
+    padding-bottom: 10px !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
   }
 }
+
 
 // 容器全高
 .art-full-height {

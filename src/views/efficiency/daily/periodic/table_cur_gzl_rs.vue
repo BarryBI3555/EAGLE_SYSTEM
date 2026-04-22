@@ -197,8 +197,8 @@
   ])
 
   // ==================== 4. 表格样式 ====================
-  const tableConfig = ref({ height: '100%', fixedHeight: true })
-  const computedTableHeight = computed(() => (tableConfig.value.fixedHeight ? '560px' : ''))
+  const tableConfig = ref({ height: '100%', fixedHeight: false })
+  const computedTableHeight = computed(() => (tableConfig.value.fixedHeight ? '660px' : 'calc(100vh - 330px)'))
 
   // ==================== 5. 构建部门下拉框 ====================
   const buildDeptOptions = (data: DailyWorkloadRsData[]) => {

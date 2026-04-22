@@ -36,6 +36,7 @@
         @refresh="handleRefresh"
         layout="refresh,size,fullscreen,columns,settings"
         fullClass="art-table-card"
+        style=""
       >
         <template #left>
           <ElSpace wrap>
@@ -65,7 +66,7 @@
         :columns="columns"
         :height="computedTableHeight"
         :scrollbar-always-on="true"
-        empty-height="560px"
+        empty-height="660px"
         @selection-change="handleSelectionChange"
         @row-click="handleRowClick"
         @header-click="handleHeaderClick"
@@ -226,8 +227,8 @@
   ])
 
   // ==================== 4. 表格样式与高度 ====================
-  const tableConfig = ref({ height: '100%', fixedHeight: true })
-  const computedTableHeight = computed(() => (tableConfig.value.fixedHeight ? '560px' : ''))
+  const tableConfig = ref({ height: '100%', fixedHeight: false })
+  const computedTableHeight = computed(() => (tableConfig.value.fixedHeight ? '660px' : 'calc(100vh - 330px)'))
 
   // ==================== 5. 构建部门下拉 ====================
   const buildDeptOptions = (data: DailyWorkloadBmData[]) => {
@@ -461,8 +462,13 @@
 </script>
 
 <style scoped>
+  .el-form-item {
+    height: 0px;
+    line-height: 0px;
+  }
   .custom-header:hover {
     color: var(--el-color-primary-light-3);
+    padding: 12px 12px 12px;
   }
 
   .demo-group .config-toggles .el-switch {

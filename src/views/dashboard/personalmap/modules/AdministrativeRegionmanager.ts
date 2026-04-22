@@ -128,6 +128,35 @@ toggleDistricts = (): void => {
     // 返回一个Promise以确保调用方可以await
     return Promise.resolve();
   };
+   /**
+   * 生成随机颜色
+   */
+  private generateRandomColor = (alpha: number = 0.3): string => {
+    const r = Math.floor(Math.random() * 156) + 50; // 50-205
+    const g = Math.floor(Math.random() * 156) + 50;
+    const b = Math.floor(Math.random() * 156) + 50;
+    return `rgba(${r},${g},${b},${alpha})`;
+  };
+  /**
+   * 生成互补的边框颜色
+   */
+  private generateBorderColor = (fillColor: string): string => {
+    // 从rgba字符串中提取RGB值
+    const match = fillColor.match(/rgba\((\d+),(\d+),(\d+)/);
+    if (!match) return '#000000';
+    
+    const r = parseInt(match[1]);
+    const g = parseInt(match[2]);
+    const b = parseInt(match[3]);
+    
+    // 生成互补色（颜色反转）
+    const borderR = 255 - r;
+    const borderG = 255 - g;
+    const borderB = 255 - b;
+    
+    return `rgb(${borderR},${borderG},${borderB})`;
+  };
+
 
   /**
    * 绘制行政区划
@@ -140,7 +169,7 @@ toggleDistricts = (): void => {
     
     const polygons: any[] = [];
     const labels: any[] = []; // 新增标签数组
-
+    const styleMap = new Map(); // 存储每个区域的样式
     // 递归处理行政区划数据
     const processDistricts = (data: any) => {
       if (!data) return;
@@ -151,18 +180,18 @@ toggleDistricts = (): void => {
         data.forEach(innerArray => {
           if (Array.isArray(innerArray)) {
             innerArray.forEach(district => {
-              this.addDistrictPolygon(district, polygons);
+              this.addDistrictPolygon(district, polygons, styleMap);
             });
           }
         });
       } else if (Array.isArray(data)) {
         // 一维数组，直接遍历
         data.forEach(district => {
-          this.addDistrictPolygon(district, polygons);
+          this.addDistrictPolygon(district, polygons, styleMap);
         });
       } else if (typeof data === 'object') {
         // 单个对象
-        this.addDistrictPolygon(data, polygons);
+        this.addDistrictPolygon(data, polygons, styleMap);
       }
     };
     
@@ -171,16 +200,14 @@ toggleDistricts = (): void => {
     
     // 创建行政区划图层
     if (polygons.length > 0) {
+      const styles: any = {};
+      styleMap.forEach((style, styleId) => {
+        styles[styleId] = new (window as any).TMap.PolygonStyle(style);
+      });
+      
       this.districtLayer = new (window as any).TMap.MultiPolygon({
         map: this.map,
-        styles: {
-          districtFill: new (window as any).TMap.PolygonStyle({
-            color: 'rgba(0,100,150,0.2)', // 半透明蓝色填充
-            strokeColor: '#006096', // 边框颜色
-            strokeWidth: 2, // 边框宽度
-            strokeStyle: 'solid' // 边框样式
-          })
-        },
+        styles: styles,
         geometries: polygons
       });
       
@@ -215,10 +242,25 @@ toggleDistricts = (): void => {
   /**
    * 添加单个行政区划多边形
    */
-  private addDistrictPolygon = (district: any, polygons: any[]): void => {
+  private addDistrictPolygon = (district: any, polygons: any[], styleMap: Map<string, any>): void => {
     if (!district || !district.polygon) {
       console.warn('跳过无效的区划数据:', district);
       return;
+    }
+     // 为每个区域生成唯一的样式ID
+    const styleId = `districtStyle_${district.id || Math.random().toString(36).substr(2, 9)}`;
+    
+    // 如果样式不存在，则创建新的样式
+    if (!styleMap.has(styleId)) {
+      const fillColor = this.generateRandomColor(0.50);
+      const borderColor = this.generateBorderColor(fillColor);
+      
+      styleMap.set(styleId, {
+        color: fillColor, // 随机填充颜色
+        strokeColor: borderColor, // 互补的边框颜色
+        strokeWidth: 2, // 边框宽度
+        strokeStyle: 'solid-bold' // 边框样式
+      });
     }
     
     // district.polygon 是一个二维数组 [[lng, lat, lng, lat, ...]]
@@ -243,7 +285,7 @@ toggleDistricts = (): void => {
         if (paths.length >= 3) { // 至少需要3个点才能构成一个多边形
           polygons.push({
             id: `${district.id || 'district'}_${ringIndex}`,
-            styleId: 'districtFill',
+            styleId: styleId,
             paths: [paths],
             properties: {
               name: district.fullname || district.name || district.title || '未知区域',
