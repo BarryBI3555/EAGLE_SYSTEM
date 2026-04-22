@@ -363,7 +363,11 @@
 
 <style lang="scss" scoped>
   .art-search-bar {
-    padding: 15px 20px 0;
+    /* 调整此值来改变art-search-bar距离上下端和左右侧的距离,
+    下端比上端少8px,该数据由
+    根据el-ui.scss中--el-col-custom-height与--el-component-custom-height的差值计算得出 */
+    padding: 8px 8px 0; 
+
 
     .action-column {
       flex: 1;
