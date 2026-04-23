@@ -131,6 +131,7 @@
   import { useTable } from '@/hooks/core/useTable'
   import * as XLSX from 'xlsx'
   import axios from 'axios'
+  const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
 
   // 组件名称（用于 devtools 调试）
   defineOptions({ name: 'DailyWorkloadBmTable' })
@@ -270,7 +271,7 @@
           comName: tableApiParams.value.comName ?? ''
         }
 
-        const response = await axios.get(`${import.meta.env.VITE_API_PROXY_PORT_URL}api/cur_gzl_bm/list`, {
+        const response = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl_bm/list`, {
           params: queryParams
         })
 
@@ -348,7 +349,7 @@
   // ==================== 9. 页面操作方法 ====================
   const handleRefresh = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_PROXY_PORT_URL}api/cur_gzl_bm/list`, {
+      const res = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl_bm/list`, {
         params: { current: 1, size: 9999 }
       })
       if (res.data?.code === 200 && res.data.data?.length) {
@@ -417,7 +418,7 @@
 
   const handleExportAll = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_PROXY_PORT_URL}api/cur_gzl_bm/list`, {
+      const res = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl_bm/list`, {
         params: tableApiParams.value
       })
       const data = res.data?.data as DailyWorkloadBmData[]
