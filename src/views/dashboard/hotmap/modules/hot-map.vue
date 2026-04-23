@@ -10,7 +10,7 @@
 
 <script setup lang="ts">
   import { onMounted, onBeforeUnmount, ref } from 'vue'
-
+  const VITE_TENCENT_MAP_WSAPI_URL = import.meta.env.VITE_TENCENT_MAP_WSAPI_URL
   // 全局类型声明
   declare global {
     interface Window {
@@ -31,7 +31,7 @@
   const loadHeatDataScript = () => {
     return new Promise((resolve, reject) => {
       const script = document.createElement('script')
-      script.src = 'https://mapapi.qq.com/web/lbs/visualizationApi/demo/data/heat.js'
+      script.src = `${VITE_TENCENT_MAP_WSAPI_URL}web/lbs/visualizationApi/demo/data/heat.js`
       script.onload = resolve
       script.onerror = reject
       document.body.appendChild(script)

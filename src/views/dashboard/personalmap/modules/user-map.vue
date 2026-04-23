@@ -187,6 +187,7 @@
 <script setup lang="ts">
   import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
   import { AdministrativeRegionManager } from './AdministrativeRegionmanager'
+  const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
   // 全局声明腾讯地图SDK和自定义属性，避免TS类型报错
   declare global {
     interface Window {
@@ -328,13 +329,13 @@
   // ==================== 获取片区列表 ====================
   const fetchGroupList = async () => {
     try {
-      let url = 'http://localhost:8080/api/locations/groups'
+      let url = `${VITE_API_PROXY_PORT_URL}api/locations/groups`
       if (selectedDate.value) url += `?date=${selectedDate.value}`
       const res = await fetch(url)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const allGroups = await res.json()
 
-      const dataUrl = `http://localhost:8080/api/locations/latest${selectedDate.value ? `?date=${selectedDate.value}` : ''}`
+      const dataUrl = `${VITE_API_PROXY_PORT_URL}api/locations/latest${selectedDate.value ? `?date=${selectedDate.value}` : ''}`
       const dataRes = await fetch(dataUrl)
       if (!dataRes.ok) throw new Error(`HTTP ${dataRes.status}`)
       const userData = await dataRes.json()
@@ -363,7 +364,7 @@
       if (searchKeyword.value) params.append('keyword', searchKeyword.value)
 
       const query = params.toString() ? `?${params.toString()}` : ''
-      const url = `http://localhost:8080/api/locations/latest${query}`
+      const url = `${VITE_API_PROXY_PORT_URL}api/locations/latest${query}`
 
       const res = await fetch(url)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -487,7 +488,7 @@
       }
       clearOverlays()
 
-      let url = `http://localhost:8080/api/locations/user/${usercode}`
+      let url = `${VITE_API_PROXY_PORT_URL}api/locations/user/${usercode}`
       if (selectedDate.value) url += `?date=${selectedDate.value}`
       const res = await fetch(url)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -551,7 +552,7 @@
         ]
       })
 
-      const carIcon = 'https://mapapi.qq.com/web/lbs/javascriptGL/demo/img/car.png'
+      const carIcon = `/src/assets/images/icon/car.png`
       carMarkerLayer = new window.TMap.MultiMarker({
         map,
         styles: {

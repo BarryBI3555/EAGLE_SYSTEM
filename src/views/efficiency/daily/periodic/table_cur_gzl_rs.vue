@@ -112,7 +112,7 @@
   import { useTable } from '@/hooks/core/useTable'
   import * as XLSX from 'xlsx'
   import axios from 'axios'
-
+  const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
   // 组件名称
   defineOptions({ name: 'DailyWorkloadRsTable' })
 
@@ -242,7 +242,7 @@
         }
 
         // 最终接口
-        const response = await axios.get('http://localhost:8080/api/cur_gzl_rs/list', {
+        const response = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl_rs/list`, {
           params: queryParams
         })
 
@@ -313,7 +313,7 @@
   // ==================== 9. 刷新 / 搜索 / 重置 ====================
   const handleRefresh = async () => {
     try {
-      const res = await axios.get('http://localhost:8080/api/cur_gzl_rs/list', {
+      const res = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl_rs/list`, {
         params: { current: 1, size: 9999 }
       })
       if (res.data?.code === 200 && res.data.data?.length) {
@@ -376,7 +376,7 @@
 
   const handleExportAll = async () => {
     try {
-      const res = await axios.get('http://localhost:8080/api/cur_gzl_rs/list', {
+      const res = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl_rs/list`, {
         params: tableApiParams.value
       })
       const data = res.data?.data as DailyWorkloadRsData[]
