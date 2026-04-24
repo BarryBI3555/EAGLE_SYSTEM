@@ -268,12 +268,12 @@
     try {
       loading.value = true;
     
-      // // 使用MapLoader加载地图API
-      // const mapLoader = MapLoader.getInstance();
-      // await mapLoader.loadMapApi();
+      // 使用MapLoader加载地图API
+      const mapLoader = MapLoader.getInstance();
+      await mapLoader.loadMapApi();
     
-      // // 获取TMap实例
-      // const TMap = await mapLoader.getMapInstance();
+      // 获取TMap实例
+      const TMap = await mapLoader.getMapInstance();
     
       // 初始化地图
       const container = document.getElementById('map-container');
@@ -703,7 +703,7 @@
   // 生命周期
   onMounted(async() => {
     try {
-      // await mapLoader.loadMapApi();
+      await mapLoader.loadMapApi();
       // 地图API加载完成，可以初始化地图
       initMap();
     } catch (error) {
