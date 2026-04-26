@@ -146,7 +146,7 @@
   import { useTable } from '@/hooks/core/useTable'
   import * as XLSX from 'xlsx'
   import axios from 'axios'
-
+  const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
   // 组件名称（用于 devtools 调试）
   defineOptions({ name: 'DailyWorkloadTable' })
 
@@ -411,7 +411,7 @@
           userName: tableApiParams.value.userName ?? ''
         }
 
-        const response = await axios.get('http://localhost:8080/api/cur_gzl/list', {
+        const response = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl/list`, {
           params: queryParams
         })
 
@@ -501,7 +501,7 @@
    */
   const handleRefresh = async () => {
     try {
-      const res = await axios.get('http://localhost:8080/api/cur_gzl/list', {
+      const res = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl/list`, {
         params: { current: 1, size: 9999 }
       })
       if (res.data?.code === 200 && res.data.data?.length) {
@@ -588,7 +588,7 @@
    */
   const handleExportAll = async () => {
     try {
-      const res = await axios.get('http://localhost:8080/api/cur_gzl/list', {
+      const res = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl/list`, {
         params: tableApiParams.value
       })
       const data = res.data?.data as DailyWorkloadData[]

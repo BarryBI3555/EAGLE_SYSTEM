@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
 
 /**
  * 行政区划管理类
@@ -43,9 +44,24 @@ toggleDistricts = (): void => {
       const center = this.map.getCenter();
       
       // 通过后端代理获取地理位置信息
-      const geocoderUrl = `http://localhost:8080/api/map/geocoder?location=${center.lat},${center.lng}`;
+      const geocoderUrl = `${VITE_API_PROXY_PORT_URL}api/map/geocoder?location=${center.lat},${center.lng}`;
       
       const geocodeResponse = await fetch(geocoderUrl);
+      
+      // 检查响应状态和内容类型
+      if (!geocodeResponse.ok) {
+        console.error('获取地理位置信息失败:', geocodeResponse.status, geocodeResponse.statusText);
+        this.showingDistricts.value = false;
+        return;
+      }
+      
+      const contentType = geocodeResponse.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('API返回非JSON数据:', contentType, await geocodeResponse.text());
+        this.showingDistricts.value = false;
+        return;
+      }
+      
       const geocodeData = await geocodeResponse.json();
       
       if (geocodeData.status === 0) {
@@ -53,8 +69,23 @@ toggleDistricts = (): void => {
         const addressComponent = geocodeData.result.address_component;
         let areaName =  addressComponent.city;
         
-        const searchUrl = `http://localhost:8080/api/map/district/search?keyword=${encodeURIComponent(areaName)}`;
+        const searchUrl = `${VITE_API_PROXY_PORT_URL}api/map/district/search?keyword=${encodeURIComponent(areaName)}`;
         const searchResponse = await fetch(searchUrl);
+        
+        // 检查响应状态和内容类型
+        if (!searchResponse.ok) {
+          console.error('搜索行政区划失败:', searchResponse.status, searchResponse.statusText);
+          this.showingDistricts.value = false;
+          return;
+        }
+        
+        const searchContentType = searchResponse.headers.get('content-type');
+        if (!searchContentType || !searchContentType.includes('application/json')) {
+          console.error('搜索API返回非JSON数据:', searchContentType, await searchResponse.text());
+          this.showingDistricts.value = false;
+          return;
+        }
+        
         const searchData = await searchResponse.json();
         
         let adcode = null;
@@ -88,8 +119,23 @@ toggleDistricts = (): void => {
         }
         
         // 通过后端代理获取下级行政区划
-        const childrenUrl = `http://localhost:8080/api/map/district/getchildren?id=${adcode}`;
+        const childrenUrl = `${VITE_API_PROXY_PORT_URL}api/map/district/getchildren?id=${adcode}`;
         const childrenResponse = await fetch(childrenUrl);
+        
+        // 检查响应状态和内容类型
+        if (!childrenResponse.ok) {
+          console.error('获取下级行政区划数据失败:', childrenResponse.status, childrenResponse.statusText);
+          this.showingDistricts.value = false;
+          return;
+        }
+        
+        const childrenContentType = childrenResponse.headers.get('content-type');
+        if (!childrenContentType || !childrenContentType.includes('application/json')) {
+          console.error('获取子区划API返回非JSON数据:', childrenContentType, await childrenResponse.text());
+          this.showingDistricts.value = false;
+          return;
+        }
+        
         const childrenData = await childrenResponse.json();
         
         if (childrenData.status === 0 && childrenData.result) {
@@ -149,12 +195,17 @@ toggleDistricts = (): void => {
     const g = parseInt(match[2]);
     const b = parseInt(match[3]);
     
-    // 生成互补色（颜色反转）
-    const borderR = 255 - r;
-    const borderG = 255 - g;
-    const borderB = 255 - b;
+    // 生成更明显的对比色
+    // 如果填充色较亮，使用深色边框；如果填充色较暗，使用亮色边框
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
     
-    return `rgb(${borderR},${borderG},${borderB})`;
+    if (brightness >0) {
+      // 亮色填充，使用深色边框
+      return `rgb(${Math.max(0, r - 100)},${Math.max(0, g - 100)},${Math.max(0, b - 100)})`;
+    } else {
+      // 暗色填充，使用亮色边框
+      return `rgb(${Math.min(255, r + 100)},${Math.min(255, g + 100)},${Math.min(255, b + 100)})`;
+    }
   };
 
 
@@ -168,7 +219,6 @@ toggleDistricts = (): void => {
     await this.hideDistricts();
     
     const polygons: any[] = [];
-    const labels: any[] = []; // 新增标签数组
     const styleMap = new Map(); // 存储每个区域的样式
     // 递归处理行政区划数据
     const processDistricts = (data: any) => {
@@ -210,28 +260,6 @@ toggleDistricts = (): void => {
         styles: styles,
         geometries: polygons
       });
-      
-      if (labels.length > 0) {
-      this.labelLayer = new (window as any).TMap.MultiLabel({
-        map: this.map,
-        styles: {
-          districtLabel: new (window as any).TMap.LabelStyle({
-            color: 'rgba(255, 255, 255, 0.8)', // 白色半透明字体
-            size: 16, // 较大字体
-            backgroundColor: 'rgba(0, 0, 0, 0.5)', // 半透明白色背景
-            borderColor: '#006096', // 边框颜色
-            borderWidth: 1, // 边框宽度
-            borderRadius: 4, // 圆角
-            padding: '4px 8px', // 内边距
-            offset: { x: 0, y: 0 }, // 偏移
-            angle: 0, // 角度
-            alignment: 'center', // 对齐方式
-            verticalAlignment: 'middle' // 垂直对齐方式
-          })
-        },
-        geometries: labels
-      });
-    }
       this.showingDistricts.value = true;
     } else {
       console.warn('没有找到有效的行政区划数据用于绘制');
@@ -252,14 +280,15 @@ toggleDistricts = (): void => {
     
     // 如果样式不存在，则创建新的样式
     if (!styleMap.has(styleId)) {
-      const fillColor = this.generateRandomColor(0.50);
+      const fillColor = this.generateRandomColor(0.40);
       const borderColor = this.generateBorderColor(fillColor);
       
       styleMap.set(styleId, {
         color: fillColor, // 随机填充颜色
-        strokeColor: borderColor, // 互补的边框颜色
-        strokeWidth: 2, // 边框宽度
-        strokeStyle: 'solid-bold' // 边框样式
+        borderColor: borderColor, // 互补的边框颜色
+        borderWidth: 10, // 增加边框宽度
+        borderStyle: 'solid', // 使用标准边框样式
+        showBorder: true
       });
     }
     
@@ -311,18 +340,18 @@ toggleDistricts = (): void => {
           data.forEach(innerArray => {
             if (Array.isArray(innerArray)) {
               innerArray.forEach(subDistrict => {
-                this.addDistrictPolygon(subDistrict, polygons);
+                this.addDistrictPolygon(subDistrict, polygons, styleMap);
               });
             }
           });
         } else if (Array.isArray(data)) {
           // 一维数组，直接遍历
           data.forEach(subDistrict => {
-            this.addDistrictPolygon(subDistrict, polygons);
+            this.addDistrictPolygon(subDistrict, polygons, styleMap);
           });
         } else if (typeof data === 'object') {
           // 单个对象
-          this.addDistrictPolygon(data, polygons);
+          this.addDistrictPolygon(data, polygons, styleMap);
         }
       };
       processDistricts(district.districts);
