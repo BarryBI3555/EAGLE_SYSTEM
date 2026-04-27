@@ -592,29 +592,62 @@
     }
   }
 
-  // 轨迹回放
-  const startPlayback = (path: any[]) => {
-    if (!carMarkerLayer || path.length < 2) return
-    try {
-      carMarkerLayer.moveAlong({ car: { path, speed: 500 } }, { autoRotation: true })
-      carMarkerLayer.on('moving', (e: any) => {
-        const passed = e.car?.passedLatLngs
-        if (passed && passed.length && trackLineLayer) {
-          try {
-            trackLineLayer.eraseTo(
-              `track-${currentDetailUser.value?.usercode}`,
-              passed.length - 1,
-              passed[passed.length - 1]
-            )
-          } catch (err: any) {
-            console.error('擦轨迹失败', err)
+ // 轨迹回放
+const startPlayback = (path: any[]) => {
+  if (!carMarkerLayer || path.length < 2) return
+  try {
+    // 保存路径引用到闭包中，供移动事件使用
+    const trackPath = [...path]; // 创建副本以防原始路径被修改
+    
+    carMarkerLayer.moveAlong({ car: { path: trackPath, speed: 500 } }, { autoRotation: true })
+    carMarkerLayer.on('moving', (e: any) => {
+      const passed = e.car?.passedLatLngs
+      if (passed && passed.length && trackLineLayer) {
+        try {
+          // 验证轨迹线是否存在对应的几何体
+          const geometryId = `track-${currentDetailUser.value?.usercode}`;
+          const geometries = trackLineLayer.getGeometries();
+          const targetGeometry = geometries.find((geo: any) => geo.id === geometryId);
+          
+          if (!targetGeometry || !targetGeometry.paths || !Array.isArray(targetGeometry.paths)) {
+            console.warn('找不到对应的轨迹线几何体或路径数据');
+            return;
           }
+          
+          const originalPaths = targetGeometry.paths;
+          
+          // 计算安全索引，确保不超过原始路径长度和passed数组长度
+          let safeIndex = Math.min(passed.length - 1, originalPaths.length - 1);
+          
+          // 进一步确保safeIndex不为负数
+          safeIndex = Math.max(0, safeIndex);
+          
+          // 额外检查确保索引有效，且passed数组中有对应元素
+          if (safeIndex < originalPaths.length && 
+              safeIndex < passed.length && 
+              passed[safeIndex]) {
+            
+            trackLineLayer.eraseTo(
+              geometryId,
+              safeIndex,
+              passed[safeIndex]
+            )
+          } else {
+            // 如果索引无效，可能是在轨迹末尾，可以选择不执行任何操作或结束动画
+            if (passed.length >= originalPaths.length) {
+              // 到达轨迹终点，可以考虑停止动画
+              console.log('到达轨迹终点');
+            }
+          }
+        } catch (err: any) {
+          console.error('擦轨迹失败', err);
         }
-      })
-    } catch (err: any) {
-      console.error('回放失败', err)
-    }
+      }
+    })
+  } catch (err: any) {
+    console.error('回放失败', err)
   }
+}
 
   // 清除临时标记
   const clearTempMarkerAndRestoreBounds = () => {
