@@ -77,7 +77,10 @@
           </div>
 
           <div class="user-list-scroll">
-            <div v-if="loading" class="user-list-loading">加载中...</div>
+            <div v-if="loading" class="user-list-loading">
+              <!-- <div class="loading-spinner"></div> -->
+              <span>加载中...</span>
+            </div>
             <div v-else-if="filteredUserList.length === 0" class="user-list-empty"
               >暂无人员数据</div
             >
@@ -155,7 +158,10 @@
               <div class="path-time">{{ formatTime(item.createTime) }}</div>
               <div class="path-coord">{{ item.address || '解析中...' }}</div>
             </div>
-            <div v-if="trackLoading" class="no-path"> 轨迹解析中... </div>
+            <div v-if="trackLoading" class="no-path">
+              <div class="loading-spinner-small"></div>
+              <span>轨迹解析中...</span>
+            </div>
             <div
               v-else-if="
                 currentUserPathList.filter(
@@ -1091,6 +1097,34 @@ const startPlayback = (path: any[]) => {
     text-align: center;
     color: #9ca3af;
     font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #4a5568;
+    border-top: 2px solid #4299e1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+  }
+
+  .loading-spinner-small {
+    width: 14px;
+    height: 14px;
+    border: 2px solid #4a5568;
+    border-top: 2px solid #4299e1;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 6px;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
   .loading,
   .error {
