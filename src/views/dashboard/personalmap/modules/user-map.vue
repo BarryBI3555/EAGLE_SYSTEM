@@ -77,7 +77,10 @@
           </div>
 
           <div class="user-list-scroll">
-            <div v-if="loading" class="user-list-loading">加载中...</div>
+            <div v-if="loading" class="user-list-loading">
+              <!-- <div class="loading-spinner"></div> -->
+              <span>加载中...</span>
+            </div>
             <div v-else-if="filteredUserList.length === 0" class="user-list-empty"
               >暂无人员数据</div
             >
@@ -155,7 +158,10 @@
               <div class="path-time">{{ formatTime(item.createTime) }}</div>
               <div class="path-coord">{{ item.address || '解析中...' }}</div>
             </div>
-            <div v-if="trackLoading" class="no-path"> 轨迹解析中... </div>
+            <div v-if="trackLoading" class="no-path">
+              <div class="loading-spinner-small"></div>
+              <span>轨迹解析中...</span>
+            </div>
             <div
               v-else-if="
                 currentUserPathList.filter(
@@ -187,7 +193,9 @@
 <script setup lang="ts">
   import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
   import { AdministrativeRegionManager } from './AdministrativeRegionmanager'
+  import { MapLoader } from '@/utils/mapLoader'
   const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
+  const mapLoader = MapLoader.getInstance()
   // 全局声明腾讯地图SDK和自定义属性，避免TS类型报错
   declare global {
     interface Window {
@@ -200,7 +208,7 @@
   type AdministrativeRegionManagerType = InstanceType<typeof AdministrativeRegionManager>
   
     // 腾讯地图api key
-  // const ApiKey = 'KJ5BZ-2JC6Q-PGA5F-4DREW-YWBR6-TEB24'
+ 
   // ==================== 地图实例与图层对象 ====================
   let map: any = null
   let markerLayer: any = null
@@ -264,15 +272,20 @@
   // ==================== 地图初始化 ====================
   const initMap = async () => {
     try {
-      let attempts = 0
-      while (!window.TMap && attempts < 100) {
-        await new Promise((resolve) => setTimeout(resolve, 100))
-        attempts++
+      loading.value = true;
+    
+      // 使用MapLoader加载地图API
+      const mapLoader = MapLoader.getInstance();
+      await mapLoader.loadMapApi();
+    
+      // 获取TMap实例
+      const TMap = await mapLoader.getMapInstance();
+    
+      // 初始化地图
+      const container = document.getElementById('map-container');
+      if (!container) {
+        throw new Error('地图容器不存在');
       }
-      if (!window.TMap) throw new Error('腾讯地图 GL SDK 加载失败')
-
-      const container = document.getElementById('map-container')
-      if (!container) throw new Error('地图容器未找到')
 
       map = new window.TMap.Map(container, {
         center: new window.TMap.LatLng(30.6799, 104.0571),
@@ -585,29 +598,62 @@
     }
   }
 
-  // 轨迹回放
-  const startPlayback = (path: any[]) => {
-    if (!carMarkerLayer || path.length < 2) return
-    try {
-      carMarkerLayer.moveAlong({ car: { path, speed: 500 } }, { autoRotation: true })
-      carMarkerLayer.on('moving', (e: any) => {
-        const passed = e.car?.passedLatLngs
-        if (passed && passed.length && trackLineLayer) {
-          try {
-            trackLineLayer.eraseTo(
-              `track-${currentDetailUser.value?.usercode}`,
-              passed.length - 1,
-              passed[passed.length - 1]
-            )
-          } catch (err: any) {
-            console.error('擦轨迹失败', err)
+ // 轨迹回放
+const startPlayback = (path: any[]) => {
+  if (!carMarkerLayer || path.length < 2) return
+  try {
+    // 保存路径引用到闭包中，供移动事件使用
+    const trackPath = [...path]; // 创建副本以防原始路径被修改
+    
+    carMarkerLayer.moveAlong({ car: { path: trackPath, speed: 500 } }, { autoRotation: true })
+    carMarkerLayer.on('moving', (e: any) => {
+      const passed = e.car?.passedLatLngs
+      if (passed && passed.length && trackLineLayer) {
+        try {
+          // 验证轨迹线是否存在对应的几何体
+          const geometryId = `track-${currentDetailUser.value?.usercode}`;
+          const geometries = trackLineLayer.getGeometries();
+          const targetGeometry = geometries.find((geo: any) => geo.id === geometryId);
+          
+          if (!targetGeometry || !targetGeometry.paths || !Array.isArray(targetGeometry.paths)) {
+            console.warn('找不到对应的轨迹线几何体或路径数据');
+            return;
           }
+          
+          const originalPaths = targetGeometry.paths;
+          
+          // 计算安全索引，确保不超过原始路径长度和passed数组长度
+          let safeIndex = Math.min(passed.length - 1, originalPaths.length - 1);
+          
+          // 进一步确保safeIndex不为负数
+          safeIndex = Math.max(0, safeIndex);
+          
+          // 额外检查确保索引有效，且passed数组中有对应元素
+          if (safeIndex < originalPaths.length && 
+              safeIndex < passed.length && 
+              passed[safeIndex]) {
+            
+            trackLineLayer.eraseTo(
+              geometryId,
+              safeIndex,
+              passed[safeIndex]
+            )
+          } else {
+            // 如果索引无效，可能是在轨迹末尾，可以选择不执行任何操作或结束动画
+            if (passed.length >= originalPaths.length) {
+              // 到达轨迹终点，可以考虑停止动画
+              console.log('到达轨迹终点');
+            }
+          }
+        } catch (err: any) {
+          console.error('擦轨迹失败', err);
         }
-      })
-    } catch (err: any) {
-      console.error('回放失败', err)
-    }
+      }
+    })
+  } catch (err: any) {
+    console.error('回放失败', err)
   }
+}
 
   // 清除临时标记
   const clearTempMarkerAndRestoreBounds = () => {
@@ -694,8 +740,14 @@
   }
 
   // 生命周期
-  onMounted(() => {
-    initMap()
+  onMounted(async() => {
+    try {
+      await mapLoader.loadMapApi();
+      // 地图API加载完成，可以初始化地图
+      initMap();
+    } catch (error) {
+      console.error('地图加载失败:', error);
+    }
   })
   onBeforeUnmount(() => {
     clearOverlays()
@@ -1045,6 +1097,34 @@
     text-align: center;
     color: #9ca3af;
     font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #4a5568;
+    border-top: 2px solid #4299e1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+  }
+
+  .loading-spinner-small {
+    width: 14px;
+    height: 14px;
+    border: 2px solid #4a5568;
+    border-top: 2px solid #4299e1;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 6px;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
   .loading,
   .error {

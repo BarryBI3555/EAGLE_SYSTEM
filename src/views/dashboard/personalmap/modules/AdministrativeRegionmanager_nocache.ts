@@ -6,9 +6,6 @@ const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
  * 提供地图上行政区划的显示、隐藏和绘制功能
  */
 export class AdministrativeRegionManager {
-  private static readonly CACHE_KEY = 'administrative_district_cache';
-  private static readonly CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30天的毫秒数
-
   private showingDistricts = ref(false);
   private loadingDistricts = ref(false);
   private districtLayer: any = null;
@@ -19,56 +16,6 @@ export class AdministrativeRegionManager {
     this.map = map;
   }
 
-  /**
-   * 从缓存获取行政区划数据
-   */
-  private getCachedDistricts(): any {
-    try {
-      const cachedData = localStorage.getItem(AdministrativeRegionManager.CACHE_KEY);
-      if (!cachedData) return null;
-
-      const parsed = JSON.parse(cachedData);
-      const now = Date.now();
-      
-      // 检查缓存是否过期
-      if (now - parsed.timestamp > AdministrativeRegionManager.CACHE_DURATION) {
-        // 缓存过期，清除它
-        localStorage.removeItem(AdministrativeRegionManager.CACHE_KEY);
-        return null;
-      }
-
-      console.log('使用缓存的行政区划数据');
-      return parsed.data;
-    } catch (error) {
-      console.error('读取缓存数据失败:', error);
-      localStorage.removeItem(AdministrativeRegionManager.CACHE_KEY);
-      return null;
-    }
-  }
-
-  /**
-   * 缓存行政区划数据
-   */
-  private setCachedDistricts(data: any): void {
-    try {
-      const cacheData = {
-        data,
-        timestamp: Date.now()
-      };
-      localStorage.setItem(AdministrativeRegionManager.CACHE_KEY, JSON.stringify(cacheData));
-      console.log('行政区划数据已缓存');
-    } catch (error) {
-      console.error('缓存行政区划数据失败:', error);
-    }
-  }
-
-  /**
-   * 清除行政区划缓存
-   */
-  public clearCache(): void {
-    localStorage.removeItem(AdministrativeRegionManager.CACHE_KEY);
-    console.log('行政区划缓存已清除');
-  }
   /**
    * 切换行政区划显示状态
    */
@@ -91,138 +38,116 @@ toggleDistricts = (): void => {
     }
 
     this.showingDistricts.value = true;
-    this.loadingDistricts.value = true;
     
     try {
-      // 首先尝试从缓存获取数据
-      let districtsData = this.getCachedDistricts();
+      // 获取当前地图中心点
+      const center = this.map.getCenter();
       
-      if (!districtsData) {
-        // 缓存中没有数据或已过期，需要从API获取
-        console.log('缓存未命中，从API获取行政区划数据');
-        
-        // 获取当前地图中心点
-        const center = this.map.getCenter();
-        
-        // 通过后端代理获取地理位置信息
-        const geocoderUrl = `${VITE_API_PROXY_PORT_URL}api/map/geocoder?location=${center.lat},${center.lng}`;
-        
-        const geocodeResponse = await fetch(geocoderUrl);
-        
-        // 检查响应状态和内容类型
-        if (!geocodeResponse.ok) {
-          console.error('获取地理位置信息失败:', geocodeResponse.status, geocodeResponse.statusText);
-          this.showingDistricts.value = false;
-          return;
-        }
-        
-        const contentType = geocodeResponse.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          console.error('API返回非JSON数据:', contentType, await geocodeResponse.text());
-          this.showingDistricts.value = false;
-          return;
-        }
-        
-        const geocodeData = await geocodeResponse.json();
-        
-        if (geocodeData.status === 0) {
-          // 使用城市名称进行搜索
-          const addressComponent = geocodeData.result.address_component;
-          let areaName =  addressComponent.city;
-          
-          const searchUrl = `${VITE_API_PROXY_PORT_URL}api/map/district/search?keyword=${encodeURIComponent(areaName)}`;
-          const searchResponse = await fetch(searchUrl);
-          
-          // 检查响应状态和内容类型
-          if (!searchResponse.ok) {
-            console.error('搜索行政区划失败:', searchResponse.status, searchResponse.statusText);
-            this.showingDistricts.value = false;
-            return;
-          }
-          
-          const searchContentType = searchResponse.headers.get('content-type');
-          if (!searchContentType || !searchContentType.includes('application/json')) {
-            console.error('搜索API返回非JSON数据:', searchContentType, await searchResponse.text());
-            this.showingDistricts.value = false;
-            return;
-          }
-          
-          const searchData = await searchResponse.json();
-          
-          let adcode = null;
-          if (searchData.status === 0 && searchData.result && Array.isArray(searchData.result)) {
-            // 尝试从结果中找到合适的地区ID
-            if (searchData.result.length > 0) {
-              // 寻找最匹配的结果，增加安全检查防止undefined错误
-              const matchedResult = searchData.result.find(item => 
-                item && 
-                Array.isArray(item) && 
-                item[0] && 
-                item[0].title && 
-                typeof item[0].title === 'string' &&
-                typeof areaName === 'string' &&
-                (item[0].title.includes(areaName) || areaName.includes(item[0].title))
-              );
-              
-              if (matchedResult && matchedResult[0]) {
-                adcode = matchedResult[0].id;
-              } else {
-                // 如果没找到精确匹配，使用第一个结果
-                adcode = searchData.result[0][0]?.id;
-              }
-            }
-          }
-          
-          if (!adcode) {
-            console.error('未能获取到有效的地区ID', searchData);
-            this.showingDistricts.value = false;
-            return;
-          }
-          
-          // 通过后端代理获取下级行政区划
-          const childrenUrl = `${VITE_API_PROXY_PORT_URL}api/map/district/getchildren?id=${adcode}`;
-          const childrenResponse = await fetch(childrenUrl);
-          
-          // 检查响应状态和内容类型
-          if (!childrenResponse.ok) {
-            console.error('获取下级行政区划数据失败:', childrenResponse.status, childrenResponse.statusText);
-            this.showingDistricts.value = false;
-            return;
-          }
-          
-          const childrenContentType = childrenResponse.headers.get('content-type');
-          if (!childrenContentType || !childrenContentType.includes('application/json')) {
-            console.error('获取子区划API返回非JSON数据:', childrenContentType, await childrenResponse.text());
-            this.showingDistricts.value = false;
-            return;
-          }
-          
-          const childrenData = await childrenResponse.json();
-          
-          if (childrenData.status === 0 && childrenData.result) {
-            districtsData = childrenData.result;
-            // 将数据缓存起来
-            this.setCachedDistricts(districtsData);
-          } else {
-            console.error('获取下级行政区划数据失败:', childrenData.message);
-            this.showingDistricts.value = false;
-            return;
-          }
-        } else {
-          console.error('获取地理位置信息失败:', geocodeData.message);
-          this.showingDistricts.value = false;
-          return;
-        }
-      } else {
-        console.log('使用缓存数据绘制行政区划');
+      // 通过后端代理获取地理位置信息
+      const geocoderUrl = `${VITE_API_PROXY_PORT_URL}api/map/geocoder?location=${center.lat},${center.lng}`;
+      
+      const geocodeResponse = await fetch(geocoderUrl);
+      
+      // 检查响应状态和内容类型
+      if (!geocodeResponse.ok) {
+        console.error('获取地理位置信息失败:', geocodeResponse.status, geocodeResponse.statusText);
+        this.showingDistricts.value = false;
+        return;
       }
       
-      // 使用获取到的数据（来自缓存或API）绘制行政区划
-      if (districtsData) {
-        await this.drawDistricts(districtsData);
-        this.showingDistricts.value = true;
+      const contentType = geocodeResponse.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('API返回非JSON数据:', contentType, await geocodeResponse.text());
+        this.showingDistricts.value = false;
+        return;
+      }
+      
+      const geocodeData = await geocodeResponse.json();
+      
+      if (geocodeData.status === 0) {
+        // 使用城市名称进行搜索
+        const addressComponent = geocodeData.result.address_component;
+        let areaName =  addressComponent.city;
+        
+        const searchUrl = `${VITE_API_PROXY_PORT_URL}api/map/district/search?keyword=${encodeURIComponent(areaName)}`;
+        const searchResponse = await fetch(searchUrl);
+        
+        // 检查响应状态和内容类型
+        if (!searchResponse.ok) {
+          console.error('搜索行政区划失败:', searchResponse.status, searchResponse.statusText);
+          this.showingDistricts.value = false;
+          return;
+        }
+        
+        const searchContentType = searchResponse.headers.get('content-type');
+        if (!searchContentType || !searchContentType.includes('application/json')) {
+          console.error('搜索API返回非JSON数据:', searchContentType, await searchResponse.text());
+          this.showingDistricts.value = false;
+          return;
+        }
+        
+        const searchData = await searchResponse.json();
+        
+        let adcode = null;
+        if (searchData.status === 0 && searchData.result && Array.isArray(searchData.result)) {
+          // 尝试从结果中找到合适的地区ID
+          if (searchData.result.length > 0) {
+            // 寻找最匹配的结果，增加安全检查防止undefined错误
+            const matchedResult = searchData.result.find(item => 
+              item && 
+              Array.isArray(item) && 
+              item[0] && 
+              item[0].title && 
+              typeof item[0].title === 'string' &&
+              typeof areaName === 'string' &&
+              (item[0].title.includes(areaName) || areaName.includes(item[0].title))
+            );
+            
+            if (matchedResult && matchedResult[0]) {
+              adcode = matchedResult[0].id;
+            } else {
+              // 如果没找到精确匹配，使用第一个结果
+              adcode = searchData.result[0][0]?.id;
+            }
+          }
+        }
+        
+        if (!adcode) {
+          console.error('未能获取到有效的地区ID', searchData);
+          this.showingDistricts.value = false;
+          return;
+        }
+        
+        // 通过后端代理获取下级行政区划
+        const childrenUrl = `${VITE_API_PROXY_PORT_URL}api/map/district/getchildren?id=${adcode}`;
+        const childrenResponse = await fetch(childrenUrl);
+        
+        // 检查响应状态和内容类型
+        if (!childrenResponse.ok) {
+          console.error('获取下级行政区划数据失败:', childrenResponse.status, childrenResponse.statusText);
+          this.showingDistricts.value = false;
+          return;
+        }
+        
+        const childrenContentType = childrenResponse.headers.get('content-type');
+        if (!childrenContentType || !childrenContentType.includes('application/json')) {
+          console.error('获取子区划API返回非JSON数据:', childrenContentType, await childrenResponse.text());
+          this.showingDistricts.value = false;
+          return;
+        }
+        
+        const childrenData = await childrenResponse.json();
+        
+        if (childrenData.status === 0 && childrenData.result) {
+          // 直接传递整个result数组给drawDistricts
+          await this.drawDistricts(childrenData.result);
+          this.showingDistricts.value = true;
+        } else {
+          console.error('获取下级行政区划数据失败:', childrenData.message);
+          this.showingDistricts.value = false;
+        }
       } else {
-        console.error('未能获取到行政区划数据');
+        console.error('获取地理位置信息失败:', geocodeData.message);
         this.showingDistricts.value = false;
       }
     } catch (error) {
@@ -248,44 +173,6 @@ toggleDistricts = (): void => {
     
     // 返回一个Promise以确保调用方可以await
     return Promise.resolve();
-  };
-
-  /**
-   * 强制刷新行政区划数据（忽略缓存）
-   */
-  public async refreshDistricts(): Promise<void> {
-    // 清除缓存
-    this.clearCache();
-    // 重新显示（这将强制从API获取新数据）
-    if (this.showingDistricts.value) {
-      await this.hideDistricts();
-      await this.showDistricts();
-    }
-  };
-
-  /**
-   * 获取缓存状态
-   */
-  public isCacheValid(): boolean {
-    const cachedData = this.getCachedDistricts();
-    return cachedData !== null;
-  };
-
-  /**
-   * 获取缓存过期时间
-   */
-  public getCacheExpiryTime(): Date | null {
-    try {
-      const cachedData = localStorage.getItem(AdministrativeRegionManager.CACHE_KEY);
-      if (!cachedData) return null;
-
-      const parsed = JSON.parse(cachedData);
-      const expiryTime = new Date(parsed.timestamp + AdministrativeRegionManager.CACHE_DURATION);
-      return expiryTime;
-    } catch (error) {
-      console.error('获取缓存过期时间失败:', error);
-      return null;
-    }
   };
    /**
    * 生成随机颜色
