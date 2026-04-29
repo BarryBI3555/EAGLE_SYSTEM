@@ -1,7 +1,7 @@
 <!-- 人员路线地图页面 -->
 <template>
   <div class="map-page">
-    <h3>⭐敬请期待...</h3>
+    <!-- <h3>3D热力图</h3> -->
     <HotMap />
   </div>
 </template>
