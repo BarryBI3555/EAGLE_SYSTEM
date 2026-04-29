@@ -7,7 +7,7 @@
 </template>
 
 <script setup lang="ts">
-  import HotMap from './modules/hot-map.vue'
+  import HotMap from './modules/3d_static_hot_map.vue'
 
   defineOptions({ name: 'HotMap' })
 </script>
