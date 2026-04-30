@@ -586,7 +586,7 @@
       currentTrackBounds = bounds
       map.fitBounds(bounds, { padding: currentTrackPadding })
 
-      setTimeout(() => startPlayback(path), 200)
+      setTimeout(() => startPlayback(path), 50)
       setTimeout(() => {
         trackLoading.value = false
       }, 2000)
@@ -605,7 +605,7 @@ const startPlayback = (path: any[]) => {
     // 保存路径引用到闭包中，供移动事件使用
     const trackPath = [...path]; // 创建副本以防原始路径被修改
     
-    carMarkerLayer.moveAlong({ car: { path: trackPath, speed: 500 } }, { autoRotation: true })
+    carMarkerLayer.moveAlong({ car: { path: trackPath, speed: 200 } }, { autoRotation: true })
     carMarkerLayer.on('moving', (e: any) => {
       const passed = e.car?.passedLatLngs
       if (passed && passed.length && trackLineLayer) {
