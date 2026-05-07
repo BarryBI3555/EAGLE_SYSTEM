@@ -106,6 +106,7 @@
   import { useMenuStore } from '@/store/modules/menu'
   import { useCommon } from '@/hooks/core/useCommon'
   import { AuthService } from '@/services/authService'
+import { LogService } from '@/services/logServices'
 
   defineOptions({ name: 'Login' })
 
@@ -207,6 +208,9 @@
       
       userStore.setLoginStatus(true)
 
+      // 记录登录日志
+      await LogService.loginLog(username)
+
       // 登录成功处理
       showLoginSuccessNotice()
 
@@ -244,12 +248,15 @@
   // 登录成功提示
   const showLoginSuccessNotice = () => {
     setTimeout(() => {
+      // 获取用户信息
+      const userInfo = userStore.getUserInfo
+      const username = userInfo.username || userInfo.usercode || '用户'
       ElNotification({
         title: t('login.success.title'),
         type: 'success',
         duration: 2500,
         zIndex: 10000,
-        message: `${t('login.success.message')}, ${systemName}!`
+        message: `${t('login.success.message')}, ${username}!`
       })
     }, 1000)
   }

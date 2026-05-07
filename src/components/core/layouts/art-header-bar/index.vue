@@ -157,6 +157,14 @@
           </ElPopover>
         </div>
 
+        <!-- 登出按钮 -->
+        <ArtIconButton
+          icon="ri:logout-box-line"
+          class="logout-btn"
+          :title="$t('topBar.user.logout')"
+          @click="handleLogout"
+        />
+
         <!-- 用户头像、菜单 -->
         <!--
         <ArtUserMenu />
@@ -180,6 +188,7 @@
   import { useSettingStore } from '@/store/modules/setting'
   import { useUserStore } from '@/store/modules/user'
   import { useMenuStore } from '@/store/modules/menu'
+  import { ElMessageBox } from 'element-plus'
   import AppConfig from '@/config'
   import { languageOptions } from '@/locales'
   import { mittBus } from '@/utils/sys'
@@ -194,7 +203,7 @@
   const isWindows = navigator.userAgent.includes('Windows')
 
   const router = useRouter()
-  const { locale } = useI18n()
+  const { locale, t } = useI18n()
   const { width } = useWindowSize()
 
   const settingStore = useSettingStore()
@@ -305,6 +314,19 @@
     if (showSettingGuide.value) {
       settingStore.hideSettingGuide()
     }
+  }
+
+  /**
+   * 登出确认
+   */
+  const handleLogout = (): void => {
+    ElMessageBox.confirm(t('common.logOutTips'), t('common.tips'), {
+      confirmButtonText: t('common.confirm'),
+      cancelButtonText: t('common.cancel'),
+      customClass: 'login-out-dialog'
+    }).then(() => {
+      userStore.logOut()
+    })
   }
 
   /**

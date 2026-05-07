@@ -194,7 +194,8 @@
   import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
   import { AdministrativeRegionManager } from './AdministrativeRegionmanager'
   import { MapLoader } from '@/utils/mapLoader'
-  import fetchWrapper from '@/utils/fetchWrapper'
+  import request from '@/utils/http'
+  import { LogService } from '@/services/logServices'
   const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
   const mapLoader = MapLoader.getInstance()
   // 全局声明腾讯地图SDK和自定义属性，避免TS类型报错
@@ -273,27 +274,27 @@
   // ==================== 地图初始化 ====================
   const initMap = async () => {
     try {
-      console.log('开始初始化地图');
+      //console.log('开始初始化地图');
       loading.value = true;
     
       // 获取TMap实例 - 现在应该已经加载完成
-      console.log('获取TMap实例');
+      //console.log('获取TMap实例');
       const mapLoader = MapLoader.getInstance();
       const TMap = await mapLoader.getMapInstance();
-      console.log('TMap实例获取完成', TMap);
+      //console.log('TMap实例获取完成', TMap);
     
       // 确保DOM已完全渲染后再初始化地图
-      console.log('等待DOM更新');
+      //console.log('等待DOM更新');
       await nextTick();
       
       // 初始化地图
-      console.log('查找地图容器');
+      //console.log('查找地图容器');
       const container = document.getElementById('map-container');
       if (!container) {
         console.error('地图容器不存在');
         throw new Error('地图容器不存在');
       }
-      console.log('地图容器找到，尺寸:', container.offsetWidth, 'x', container.offsetHeight);
+      //console.log('地图容器找到，尺寸:', container.offsetWidth, 'x', container.offsetHeight);
 
       // 确保容器有尺寸
       if (container.offsetWidth === 0 || container.offsetHeight === 0) {
@@ -304,7 +305,7 @@
         container.style.display = '';
       }
 
-      console.log('开始创建地图实例');
+      //console.log('开始创建地图实例');
       map = new TMap.Map(container, {
         center: new TMap.LatLng(30.6799, 104.0571),
         zoom: 12,
@@ -314,7 +315,7 @@
         scrollwheel: true,
         mapStyleId: 'style1'
       });
-      console.log('地图实例创建完成', map);
+      //console.log('地图实例创建完成', map);
 
       const zoomControl = map.getControl(TMap.constants.DEFAULT_CONTROL_ID.ZOOM)
       const rotationControl = map.getControl(TMap.constants.DEFAULT_CONTROL_ID.ROTATION)
@@ -366,8 +367,11 @@
       const params: Record<string, any> = {}
       if (selectedDate.value) params.date = selectedDate.value
       
-      const allGroups = await fetchWrapper.get<any[]>('/api/locations/groups', params)
-      const userData = await fetchWrapper.get<any[]>('/api/locations/latest', params)
+      // 记录日期筛选日志
+      await LogService.userMapLog('日期筛选', params)
+      
+      const allGroups = await request.get({ url: '/api/locations/groups', params })
+      const userData = await request.get({ url: '/api/locations/latest', params })
 
       const groupsWithData = new Set(userData.map((user: any) => user.groupscode))
       const filteredGroups = (allGroups || []).filter((group: any) =>
@@ -392,7 +396,10 @@
       if (selectedGroupCode.value) params.groupscode = selectedGroupCode.value
       if (searchKeyword.value) params.keyword = searchKeyword.value
 
-      const data = await fetchWrapper.get<any[]>('/api/locations/latest', params)
+      // 记录筛选日志
+      await LogService.userMapLog('筛选人员', params)
+
+      const data = await request.get({ url: '/api/locations/latest', params })
       clearOverlays()
 
       userList.value = data || []
@@ -467,6 +474,7 @@
 
   // 筛选按钮
   const filterUsers = async () => {
+    
     await fetchLatestLocations()
   }
 
@@ -495,6 +503,9 @@
 
   // 查看人员详情
   const showUserDetail = async (user: any) => {
+    // 记录查看人员详情日志
+    await LogService.userMapLog('查看人员详情', { usercode: user.usercode, username: user.username })
+    
     selectedUser.value = user.usercode
     showDetailMode.value = true
     currentDetailUser.value = user
@@ -514,7 +525,7 @@
 
       const params: Record<string, any> = {};
       if (selectedDate.value) params.date = selectedDate.value;
-      const data = await fetchWrapper.get(`/api/locations/user/${usercode}`, params)
+      const data = await request.get({ url: `/api/locations/user/${usercode}`, params })
 
       if (!data || data.length === 0) {
         error.value = '该用户当日无轨迹数据'
@@ -650,7 +661,7 @@ const startPlayback = (path: any[]) => {
             // 如果索引无效，可能是在轨迹末尾，可以选择不执行任何操作或结束动画
             if (passed.length >= originalPaths.length) {
               // 到达轨迹终点，可以考虑停止动画
-              console.log('到达轨迹终点');
+              //console.log('到达轨迹终点');
             }
           }
         } catch (err: any) {

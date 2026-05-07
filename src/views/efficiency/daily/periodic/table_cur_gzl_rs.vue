@@ -111,7 +111,8 @@
   import { ElNotification } from 'element-plus'
   import { useTable } from '@/hooks/core/useTable'
   import * as XLSX from 'xlsx'
-  import fetchWrapper from '@/utils/fetchWrapper'
+  import { LogService } from '@/services/logServices'
+  import request from '@/utils/http'
   const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
   // 组件名称
   defineOptions({ name: 'DailyWorkloadRsTable' })
@@ -242,17 +243,20 @@
         }
 
         // 最终接口
-        const response = await fetchWrapper.get('api/cur_gzl_rs/list', queryParams)
+        const response = await request.get({ url: 'api/cur_gzl_rs/list', params: queryParams })
 
-        if (!isInitialized.value && response?.code === 200 && response.data?.length) {
-          allOriginData.value = [...response.data]
-          buildDeptOptions(allOriginData.value)
-          isInitialized.value = true
-        }
-
+        // request.get 返回的已经是 res.data.data（后端返回的数据部分）
         let tableResultData: DailyWorkloadRsData[] = []
-        if (response?.code === 200 && Array.isArray(response.data)) {
-          tableResultData = response.data
+        
+        if (Array.isArray(response)) {
+          tableResultData = response
+          
+          if (!isInitialized.value && tableResultData.length) {
+            allOriginData.value = [...tableResultData]
+            buildDeptOptions(allOriginData.value)
+            isInitialized.value = true
+          }
+
           if (tableResultData.length) {
             currentMaxTjTime.value = tableResultData[0].maxTjTime || ''
           } else {
@@ -311,7 +315,10 @@
   // ==================== 9. 刷新 / 搜索 / 重置 ====================
   const handleRefresh = async () => {
     try {
-      const res = await fetchWrapper.get('api/cur_gzl_rs/list', { current: 1, size: 9999 })
+      // 记录刷新日志
+      // await LogService.tableLog('人伤当日工作量统计', '刷新', tableApiParams.value)
+      
+      const res = await request.get({ url: 'api/cur_gzl_rs/list', params: { current: 1, size: 9999 } })
       if (res?.code === 200 && res.data?.length) {
         allOriginData.value = [...res.data]
         buildDeptOptions(allOriginData.value)
@@ -327,6 +334,10 @@
     try {
       if (searchBarRef.value) await searchBarRef.value.validate()
       tableApiParams.value = { ...tableApiParams.value, ...searchFormState.value }
+      
+      // 记录搜索日志
+      await LogService.tableLog('人伤当日工作量统计', '搜索', searchFormState.value)
+      
       refreshData()
       ElNotification({ title: '提示', message: '搜索成功', type: 'success' })
     } catch {
@@ -351,6 +362,9 @@
       ElNotification({ title: '提示', message: '暂无数据可导出', type: 'warning' })
       return
     }
+    
+    // 记录导出日志
+    await LogService.tableLog('人伤当日工作量统计', '导出当前页', tableApiParams.value)
 
     const exportData = data.map((item, index) => ({
       序号: index + 1,
@@ -372,7 +386,10 @@
 
   const handleExportAll = async () => {
     try {
-      const res = await fetchWrapper.get('api/cur_gzl_rs/list', tableApiParams.value)
+      // 记录导出日志
+      await LogService.tableLog('人伤当日工作量统计', '导出全部', tableApiParams.value)
+      
+      const res = await request.get({ url: 'api/cur_gzl_rs/list', params: tableApiParams.value })
       const data = res.data as DailyWorkloadRsData[]
       if (!data.length) {
         ElNotification({ title: '提示', message: '暂无数据可导出', type: 'warning' })

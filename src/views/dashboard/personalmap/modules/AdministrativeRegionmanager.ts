@@ -1,5 +1,6 @@
 import { ref } from 'vue';
-import fetchWrapper from '@/utils/fetchWrapper';
+import request from '@/utils/http';
+import { LogService } from '@/services/logServices';
 
 const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
 
@@ -74,11 +75,14 @@ export class AdministrativeRegionManager {
   /**
    * 切换行政区划显示状态
    */
-toggleDistricts = (): void => {
+toggleDistricts = async (): Promise<void> => {
+    // 记录切换行政区划日志
+    // await LogService.userMapLog('切换行政区划显示');
+    
     if (this.showingDistricts.value) {
-      this.hideDistricts();
+      await this.hideDistricts();
     } else {
-      this.showDistricts();
+      await this.showDistricts();
     }
   };
 
@@ -91,6 +95,9 @@ toggleDistricts = (): void => {
       this.showingDistricts.value = false;
       return;
     }
+
+    // 记录显示行政区划日志
+    await LogService.userMapLog('加载行政区划');
 
     this.showingDistricts.value = true;
     this.loadingDistricts.value = true;
@@ -109,7 +116,7 @@ toggleDistricts = (): void => {
         // 通过后端代理获取地理位置信息
         const geocoderUrl = `${VITE_API_PROXY_PORT_URL}api/map/geocoder?location=${center.lat},${center.lng}`;
         
-        const geocodeData = await fetchWrapper.get(geocoderUrl);
+        const geocodeData = await request.get({ url: geocoderUrl });
         
         // 检查响应数据状态
         if (!geocodeData || geocodeData.status !== 0) {
@@ -124,7 +131,7 @@ toggleDistricts = (): void => {
           let areaName =  addressComponent.city;
           
           const searchUrl = `${VITE_API_PROXY_PORT_URL}api/map/district/search?keyword=${encodeURIComponent(areaName)}`;
-          const searchData = await fetchWrapper.get(searchUrl);
+          const searchData = await request.get({ url: searchUrl });
           
           // 检查响应数据状态
           if (!searchData || searchData.status !== 0) {
@@ -164,7 +171,7 @@ toggleDistricts = (): void => {
           }
           
           // 通过后端代理获取下级行政区划
-        const childrenData = await fetchWrapper.get('api/map/district/getchildren', { id: adcode });
+        const childrenData = await request.get({ url: 'api/map/district/getchildren', params: { id: adcode } });
           
           if (childrenData && childrenData.status === 0 && childrenData.result) {
             districtsData = childrenData.result;
@@ -205,6 +212,9 @@ toggleDistricts = (): void => {
    * 隐藏行政区划
    */
   hideDistricts = async (): Promise<void> => {
+    // 记录隐藏行政区划日志
+    await LogService.userMapLog('隐藏行政区划');
+    
     if (this.districtLayer) {
       this.districtLayer.setMap(null);
       this.districtLayer = null;

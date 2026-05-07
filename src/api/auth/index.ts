@@ -9,39 +9,39 @@ import { useUserStore } from '@/store/modules/user'
 export async function fetchGetUserInfo(): Promise<Api.Auth.UserInfo> {
   try {
     const userStore = useUserStore()
-    console.log('开始请求用户信息...')
-    console.log('当前用户store信息:', {
-      isLogin: userStore.isLogin,
-      accessToken: userStore.accessToken ? '存在' : '不存在',
-      userInfo: userStore.info
-    })
+    // console.log('开始请求用户信息...')
+    // console.log('当前用户store信息:', {
+    //   isLogin: userStore.isLogin,
+    //   accessToken: userStore.accessToken ? '存在' : '不存在',
+    //   userInfo: userStore.info
+    // })
     
     const response = await request.get('/api/auth/info')
     
-    console.log('获取用户信息响应状态:', response.status)
-    console.log('获取用户信息响应数据:', response.data)
+    // console.log('获取用户信息响应状态:', response.status)
+    // console.log('获取用户信息响应数据:', response.data)
     
     // 统一响应格式处理: { code: 200, msg: "success", data: {...} }
     if (response.data && response.data.code === 200 && response.data.data) {
-      console.log('解析用户数据成功:', response.data.data)
+      // console.log('解析用户数据成功:', response.data.data)
       return response.data.data
     }
     
     // 如果直接返回用户数据
-    console.log('返回原始用户数据:', response.data)
+    // console.log('返回原始用户数据:', response.data)
     return response.data
   } catch (error: any) {
-    console.error('获取用户信息失败:', error)
-    console.error('错误详情:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message
-    })
+    // console.error('获取用户信息失败:', error)
+    // console.error('错误详情:', {
+    //   status: error.response?.status,
+    //   statusText: error.response?.statusText,
+    //   data: error.response?.data,
+    //   message: error.message
+    // })
     
     // 如果请求失败且状态码为401或403，执行登出操作
     if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-      console.log('检测到认证错误，执行登出操作')
+      // console.log('检测到认证错误，执行登出操作')
       AuthService.logout()
     }
     throw error

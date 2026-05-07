@@ -54,8 +54,8 @@ export class MapLoader {
         script.async = true; // 异步加载
         
         script.onload = () => {
-          console.log('腾讯地图API脚本加载完成');
-          console.log('检查TMap是否存在:', !!(window as any).TMap);
+          // console.log('腾讯地图API脚本加载完成');
+          // console.log('检查TMap是否存在:', !!(window as any).TMap);
           
           // 等待TMap完全初始化
           this.waitForTMapInitialization(resolve, reject);
@@ -84,7 +84,7 @@ export class MapLoader {
         window.addEventListener('error', globalErrorHandler);
 
         // 先添加脚本标签，再执行可能的全局函数
-        console.log('即将插入地图API脚本标签');
+        // console.log('即将插入地图API脚本标签');
         document.head.appendChild(script);
         
         // 添加额外的错误处理以应对可能的第三方请求问题
@@ -111,11 +111,11 @@ export class MapLoader {
    * 等待TMap完全初始化
    */
   private waitForTMapInitialization(resolve: (value: boolean | PromiseLike<boolean>) => void, reject: (reason?: any) => void): void {
-    console.log('开始等待TMap初始化');
+    // console.log('开始等待TMap初始化');
     
     // 立即检查TMap是否已经可用
     if ((window as any).TMap) {
-      console.log('TMap已初始化');
+      // console.log('TMap已初始化');
       this.mapLoaded = true;
       resolve(true);
       return;
@@ -124,7 +124,7 @@ export class MapLoader {
     // 使用MutationObserver监测DOM变化，可能有助于检测地图库初始化
     const observer = new MutationObserver(() => {
       if ((window as any).TMap) {
-        console.log('通过MutationObserver检测到TMap初始化完成');
+        // console.log('通过MutationObserver检测到TMap初始化完成');
         cleanupAndResolve();
       }
     });
@@ -135,10 +135,10 @@ export class MapLoader {
     
     const checkTMap = () => {
       attempts++;
-      console.log('检查TMap初始化状态，第', attempts, '次尝试');
+      // console.log('检查TMap初始化状态，第', attempts, '次尝试');
       
       if ((window as any).TMap) {
-        console.log('TMap在第', attempts, '次尝试后初始化完成');
+        // console.log('TMap在第', attempts, '次尝试后初始化完成');
         cleanupAndResolve();
       } else if (attempts >= maxAttempts) {
         console.error('TMap初始化超时，当前window对象内容:', Object.keys(window));

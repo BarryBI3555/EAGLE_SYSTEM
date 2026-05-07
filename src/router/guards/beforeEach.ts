@@ -174,7 +174,7 @@ async function handleRouteGuard(
     // 防止并发请求（快速连续导航场景）
     if (routeInitInProgress) {
       // 正在初始化中，等待完成后重新导航
-      console.log('[RouteGuard] 动态路由正在注册中，等待完成...')
+      // console.log('[RouteGuard] 动态路由正在注册中，等待完成...')
       // 短暂延迟后重试
       setTimeout(() => {
         router.replace(to.fullPath).catch(err => console.error('重试导航失败:', err))
@@ -182,7 +182,7 @@ async function handleRouteGuard(
       next(false)
       return
     }
-    console.log('[RouteGuard] 开始处理动态路由注册')
+    // console.log('[RouteGuard] 开始处理动态路由注册')
     await handleDynamicRoutes(to, next, router)
     return
   }
@@ -310,8 +310,8 @@ async function handleDynamicRoutes(
     routeInitInProgress = false
 
     // 9. 重新导航到目标路由
-    console.log('[RouteGuard] 检查权限，目标路径:', to.path, '验证路径:', validatedPath, '有权限:', hasPermission)
-    console.log('[RouteGuard] 用户角色:', userStore.info?.roles)
+    // console.log('[RouteGuard] 检查权限，目标路径:', to.path, '验证路径:', validatedPath, '有权限:', hasPermission)
+    // console.log('[RouteGuard] 用户角色:', userStore.info?.roles)
     
     if (!hasPermission) {
       // 无权限访问，跳转到首页
@@ -319,14 +319,14 @@ async function handleDynamicRoutes(
 
       // 输出警告信息
       console.warn(`[RouteGuard] 用户无权限访问路径: ${to.path}，已跳转到首页`)
-      console.log('[RouteGuard] 目标路径:', to.path)
-      console.log('[RouteGuard] 验证后的路径:', validatedPath)
-      console.log('[RouteGuard] 菜单列表长度:', menuList.length)
-      console.log('[RouteGuard] 用户角色:', userStore.info?.roles)
+      // console.log('[RouteGuard] 目标路径:', to.path)
+      // console.log('[RouteGuard] 验证后的路径:', validatedPath)
+      // console.log('[RouteGuard] 菜单列表长度:', menuList.length)
+      // console.log('[RouteGuard] 用户角色:', userStore.info?.roles)
       
       // 检查是否有可用的菜单路径作为首页
       const availablePaths = RoutePermissionValidator.buildMenuPathSet(menuList)
-      console.log('[RouteGuard] 可用的菜单路径:', Array.from(availablePaths))
+      // console.log('[RouteGuard] 可用的菜单路径:', Array.from(availablePaths))
       
       // 如果有可用路径，选择第一个作为默认首页
       let finalPath = validatedPath
@@ -342,13 +342,13 @@ async function handleDynamicRoutes(
     } else {
       // 有权限，但需要检查路由是否真实存在
       // 有时候路由注册完成但路由表还没完全更新
-      console.log('[RouteGuard] 用户有权限，准备导航到:', to.path)
+      // console.log('[RouteGuard] 用户有权限，准备导航到:', to.path)
       
       // 等待下一个事件循环，确保路由注册完成
       await new Promise(resolve => setTimeout(resolve, 50))
       
       if (to.path === validatedPath && router.hasRoute(to.name || '')) {
-        console.log('[RouteGuard] 路由存在，正常导航')
+        // console.log('[RouteGuard] 路由存在，正常导航')
         // 路由存在，正常导航
         next({
           path: to.path,
@@ -358,17 +358,17 @@ async function handleDynamicRoutes(
         })
       } else {
         // 路由可能还未完全注册完成，稍等后重试
-        console.log('[RouteGuard] 路由可能未完全注册，稍等后重试')
-        console.log('[RouteGuard] 当前所有已注册路由:', router.getRoutes().map(r => ({ path: r.path, name: r.name })))
+        // console.log('[RouteGuard] 路由可能未完全注册，稍等后重试')
+        // console.log('[RouteGuard] 当前所有已注册路由:', router.getRoutes().map(r => ({ path: r.path, name: r.name })))
         
         // 再次检查目标路由是否存在
         if (router.hasRoute(to.name || '')) {
-          console.log('[RouteGuard] 路由现在存在，直接导航')
+          // console.log('[RouteGuard] 路由现在存在，直接导航')
           next()
         } else {
           // 路由仍然不存在，跳转到首页
           console.warn('[RouteGuard] 路由注册失败，跳转到首页')
-          console.log('[RouteGuard] 检查所有已注册路由:', router.getRoutes().map(r => r.path))
+          // console.log('[RouteGuard] 检查所有已注册路由:', router.getRoutes().map(r => r.path))
           
           // 尝试找到一个可用的路径
           const availablePaths = RoutePermissionValidator.buildMenuPathSet(menuList)
@@ -484,19 +484,19 @@ function handleRootPathRedirect(to: RouteLocationNormalized, next: NavigationGua
   
   // 等待动态路由注册完成
   if (!routeRegistry?.isRegistered()) {
-    console.log('[RouteGuard] 动态路由尚未注册完成，稍后重试')
+    // console.log('[RouteGuard] 动态路由尚未注册完成，稍后重试')
     // 不立即跳转，而是继续执行路由守卫流程
     return false
   }
   
   if (homePath.value && homePath.value !== '/') {
-    console.log('[RouteGuard] 重定向到用户首页:', homePath.value)
+    // console.log('[RouteGuard] 重定向到用户首页:', homePath.value)
     next({ path: homePath.value, replace: true })
     return true
   }
 
   // 如果没有找到首页路径，默认跳转到仪表盘
-  console.log('[RouteGuard] 默认重定向到仪表盘')
+  // console.log('[RouteGuard] 默认重定向到仪表盘')
   next({ path: '/dashboard', replace: true })
   return true
 }

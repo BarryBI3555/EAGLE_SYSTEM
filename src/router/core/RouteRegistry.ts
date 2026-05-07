@@ -32,7 +32,7 @@ export class RouteRegistry {
    * 注册动态路由
    */
   register(menuList: AppRouteRecord[]): void {
-    console.log('[RouteRegistry] 开始注册动态路由，菜单数量:', menuList.length)
+    // console.log('[RouteRegistry] 开始注册动态路由，菜单数量:', menuList.length)
     if (this.registered) {
       console.warn('[RouteRegistry] 路由已注册，跳过重复注册')
       return
@@ -48,20 +48,20 @@ export class RouteRegistry {
     const removeRouteFns: (() => void)[] = []
 
     menuList.forEach((route) => {
-      console.log('[RouteRegistry] 尝试注册路由:', route.name, '路径:', route.path)
+      // console.log('[RouteRegistry] 尝试注册路由:', route.name, '路径:', route.path)
       if (route.name && !this.router.hasRoute(route.name)) {
         const routeConfig = this.transformer.transform(route)
         const removeRouteFn = this.router.addRoute(routeConfig as RouteRecordRaw)
         removeRouteFns.push(removeRouteFn)
-        console.log('[RouteRegistry] 成功注册路由:', route.name, '路径:', route.path)
+        // console.log('[RouteRegistry] 成功注册路由:', route.name, '路径:', route.path)
       } else {
-        console.log('[RouteRegistry] 路由已存在或名称为空，跳过:', route.name, '路径:', route.path)
+        // console.log('[RouteRegistry] 路由已存在或名称为空，跳过:', route.name, '路径:', route.path)
       }
     })
 
     this.removeRouteFns = removeRouteFns
     this.registered = true
-    console.log('[RouteRegistry] 动态路由注册完成，共注册', removeRouteFns.length, '个路由')
+    // console.log('[RouteRegistry] 动态路由注册完成，共注册', removeRouteFns.length, '个路由')
   }
 
   /**
