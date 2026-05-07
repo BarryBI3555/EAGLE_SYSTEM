@@ -15,7 +15,6 @@
  */
 
 import axios, { AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
-import { useUserStore } from '@/store/modules/user'
 import { ApiStatus } from './status'
 import { HttpError, handleError, showError, showSuccess } from './error'
 import { $t } from '@/locales'
@@ -64,8 +63,12 @@ const axiosInstance = axios.create({
 /** 请求拦截器 */
 axiosInstance.interceptors.request.use(
   (request: InternalAxiosRequestConfig) => {
-    const { accessToken } = useUserStore()
-    if (accessToken) request.headers.set('Authorization', accessToken)
+    // 从 localStorage 获取 token
+    const token = localStorage.getItem('access_token')
+    if (token) {
+      // 根据后端要求，使用Bearer token格式
+      request.headers.set('Authorization', `Bearer ${token}`)
+    }
 
     if (request.data && !(request.data instanceof FormData) && !request.headers['Content-Type']) {
       request.headers.set('Content-Type', 'application/json')
@@ -83,7 +86,14 @@ axiosInstance.interceptors.request.use(
 /** 响应拦截器 */
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse<BaseResponse>) => {
-    const { code, msg } = response.data
+    const data = response.data
+    
+    // 如果后端直接返回数组（没有code字段），直接返回
+    if (Array.isArray(data)) {
+      return response
+    }
+    
+    const { code, msg } = data
     if (code === ApiStatus.success) return response
     if (code === ApiStatus.unauthorized) handleUnauthorizedError(msg)
     throw createHttpError(msg || $t('httpMsg.requestFailed'), code)
@@ -182,6 +192,12 @@ async function request<T = any>(config: ExtendedAxiosRequestConfig): Promise<T> 
       showSuccess(res.data.msg)
     }
 
+    // 如果后端直接返回数组，返回数组本身
+    if (Array.isArray(res.data)) {
+      return res.data as T
+    }
+    
+    // 否则返回 data 字段
     return res.data.data as T
   } catch (error) {
     if (error instanceof HttpError && error.code !== ApiStatus.unauthorized) {

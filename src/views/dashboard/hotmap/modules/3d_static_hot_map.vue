@@ -62,6 +62,10 @@ import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { AdministrativeRegionManager } from '../../personalmap/modules/AdministrativeRegionmanager'
 import { MapLoader } from '@/utils/mapLoader'
 import { ElRow, ElCol } from 'element-plus'
+import request from '@/utils/http'
+import LogService from '@/services/logServices'
+
+
 const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
 // 全局类型声明
 declare global {
@@ -119,21 +123,11 @@ const statsCards = ref([
 // ==================== 获取统计卡片数据 ====================
 const fetchStatsCardsData = async () => {
   try {
-    let url = `${VITE_API_PROXY_PORT_URL}api/statsCardsData`
-    if (selectedDate.value) {
-      url += `?date=${selectedDate.value}`
-    }
+    const params = selectedDate.value ? { date: selectedDate.value } : {}
 
-    // console.log('请求统计数据URL:', url)  // 调试信息
+    // console.log('请求统计数据URL:', `${VITE_API_PROXY_PORT_URL}api/statsCardsData`, params)  // 调试信息
 
-    const response = await fetch(url)
-    // console.log('响应状态:', response.status)  // 调试信息
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const data = await response.json()
+    const data = await request.get({ url: 'api/statsCardsData', params })
     // console.log('后端返回数据:', data)  // 调试信息
 
     // 更新统计卡片数据
@@ -180,14 +174,14 @@ const selectedDate = ref<string | null>(formatDate(today))
 //   }
 const fetchHeatMap = async () => {
   try {
-    let url = `${VITE_API_PROXY_PORT_URL}api/hotmap`
-    if (selectedDate.value) {
-      url += `?date=${selectedDate.value}`
-    }
-    const response = await fetch(url)
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    const data = await response.json()
+    const params = selectedDate.value ? { date: selectedDate.value } : {}
+    
+    const data = await request.get({ url: 'api/hotmap', params })
+    // 记录筛选日志
+    await LogService.hotmapLog('筛选并查看', params)
+
     window.heatData = data
+    
 
     // 更新热力图数据
     if (heat) {
@@ -287,10 +281,6 @@ const initHeatMap = () => {
   }).addTo(map)
   console.log(window.heatData)
   heat.setData(window.heatData)
-  heat.setGradientColor({
-    start: '#FF0000',
-    end: '#00FF00'
-  })
 }
 
 // ==================== 生命周期 ====================

@@ -40,9 +40,15 @@ export class RoutePermissionValidator {
 
     // 构建路径集合
     const pathSet = this.buildMenuPathSet(menuList)
+    // console.log('[RoutePermissionValidator] 检查路径权限:', targetPath, '可用路径:', Array.from(pathSet))
 
     // 检查路径是否在集合中（精确匹配或前缀匹配）
-    return pathSet.has(targetPath) || this.checkPathPrefix(targetPath, pathSet)
+    const hasExactMatch = pathSet.has(targetPath)
+    const hasPrefixMatch = this.checkPathPrefix(targetPath, pathSet)
+    
+    // console.log('[RoutePermissionValidator] 精确匹配结果:', hasExactMatch, '前缀匹配结果:', hasPrefixMatch)
+    
+    return hasExactMatch || hasPrefixMatch
   }
 
   /**

@@ -126,12 +126,14 @@
 </template>
 
 <script setup lang="ts">
+
   import { ref, computed, onMounted, nextTick } from 'vue'
   import { Download } from '@element-plus/icons-vue'
   import { ElNotification } from 'element-plus'
   import { useTable } from '@/hooks/core/useTable'
   import * as XLSX from 'xlsx'
-  import axios from 'axios'
+  import { LogService } from '@/services/logServices'
+  import request from '@/utils/http'
   const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
 
   // 组件名称（用于 devtools 调试）
@@ -272,19 +274,19 @@
           comName: tableApiParams.value.comName ?? ''
         }
 
-        const response = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl_bm/list`, {
-          params: queryParams
-        })
+        const response = await request.get({ url: 'api/cur_gzl_bm/list', params: queryParams })
 
-        if (!isInitialized.value && response.data?.code === 200 && response.data.data?.length) {
-          allOriginData.value = [...response.data.data]
-          buildDeptOptions(allOriginData.value)
-          isInitialized.value = true
-        }
-
+        // request.get 返回的已经是 res.data.data（后端返回的数据部分）
         let tableResultData: DailyWorkloadBmData[] = []
-        if (response.data?.code === 200 && Array.isArray(response.data.data)) {
-          tableResultData = response.data.data
+        
+        if (Array.isArray(response)) {
+          tableResultData = response
+          
+          if (!isInitialized.value && tableResultData.length) {
+            allOriginData.value = [...tableResultData]
+            buildDeptOptions(allOriginData.value)
+            isInitialized.value = true
+          }
 
           if (tableResultData.length) {
             currentMaxTjTime.value = tableResultData[0].maxTjTime || ''
@@ -350,13 +352,14 @@
   // ==================== 9. 页面操作方法 ====================
   const handleRefresh = async () => {
     try {
-      const res = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl_bm/list`, {
-        params: { current: 1, size: 9999 }
-      })
-      if (res.data?.code === 200 && res.data.data?.length) {
-        allOriginData.value = [...res.data.data]
+      // // 记录刷新日志
+      // await LogService.tableLog('部门当日工作量统计', '刷新', tableApiParams.value)
+      
+      const res = await request.get({ url: 'api/cur_gzl_bm/list', params: { current: 1, size: 9999 } })
+      if (res?.code === 200 && res.data?.length) {
+        allOriginData.value = [...res.data]
         buildDeptOptions(allOriginData.value)
-        currentMaxTjTime.value = res.data.data[0].maxTjTime || ''
+        currentMaxTjTime.value = res.data[0].maxTjTime || ''
       }
       refreshData()
     } catch {
@@ -368,6 +371,10 @@
     try {
       if (searchBarRef.value) await searchBarRef.value.validate()
       tableApiParams.value = { ...tableApiParams.value, ...searchFormState.value }
+      
+      // 记录搜索日志
+      await LogService.tableLog('部门当日工作量统计', '搜索', searchFormState.value)
+      
       refreshData()
       ElNotification({ title: '提示', message: '搜索成功', type: 'success' })
     } catch {
@@ -392,6 +399,9 @@
       ElNotification({ title: '提示', message: '暂无数据可导出', type: 'warning' })
       return
     }
+    
+    // 记录导出日志
+    await LogService.tableLog('部门当日工作量统计', '导出当前页', tableApiParams.value)
 
     const exportData = data.map((item, index) => ({
       序号: index + 1,
@@ -419,10 +429,11 @@
 
   const handleExportAll = async () => {
     try {
-      const res = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl_bm/list`, {
-        params: tableApiParams.value
-      })
-      const data = res.data?.data as DailyWorkloadBmData[]
+      // 记录导出日志
+      await LogService.tableLog('部门当日工作量统计', '导出全部', tableApiParams.value)
+      
+      const res = await request.get({ url: 'api/cur_gzl_bm/list', params: tableApiParams.value })
+      const data = res.data as DailyWorkloadBmData[]
       if (!data.length) {
         ElNotification({ title: '提示', message: '暂无数据可导出', type: 'warning' })
         return
