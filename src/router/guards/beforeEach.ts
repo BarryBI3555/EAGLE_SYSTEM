@@ -48,9 +48,10 @@ import { staticRoutes } from '../routes/staticRoutes'
 import { loadingService } from '@/utils/ui'
 import { useCommon } from '@/hooks/core/useCommon'
 import { useWorktabStore } from '@/store/modules/worktab'
-import { fetchGetUserInfo } from '@/api/auth'
+import { fetchGetUserInfo } from '@/api/auth/index'
 import { ApiStatus } from '@/utils/http/status'
 import { isHttpError } from '@/utils/http/error'
+import { AuthService } from '@/services/authService'
 import { RouteRegistry, MenuProcessor, IframeRouteManager, RoutePermissionValidator } from '../core'
 
 // 路由注册器实例
@@ -173,9 +174,15 @@ async function handleRouteGuard(
     // 防止并发请求（快速连续导航场景）
     if (routeInitInProgress) {
       // 正在初始化中，等待完成后重新导航
+      // console.log('[RouteGuard] 动态路由正在注册中，等待完成...')
+      // 短暂延迟后重试
+      setTimeout(() => {
+        router.replace(to.fullPath).catch(err => console.error('重试导航失败:', err))
+      }, 100)
       next(false)
       return
     }
+    // console.log('[RouteGuard] 开始处理动态路由注册')
     await handleDynamicRoutes(to, next, router)
     return
   }
@@ -212,11 +219,15 @@ function handleLoginStatus(
   }
 
   // 未登录且访问需要权限的页面，跳转到登录页并携带 redirect 参数
-  userStore.logOut()
-  next({
-    name: 'Login',
-    query: { redirect: to.fullPath }
-  })
+  // 特殊处理根路径：如果未登录用户访问根路径，直接跳转到登录页
+  if (to.path === '/') {
+    next({ name: 'Login' })
+  } else {
+    next({
+      name: 'Login',
+      query: { redirect: to.fullPath }
+    })
+  }
   return false
 }
 
@@ -252,6 +263,8 @@ async function handleDynamicRoutes(
   next: NavigationGuardNext,
   router: Router
 ): Promise<void> {
+  const userStore = useUserStore()
+  
   // 标记初始化进行中
   routeInitInProgress = true
 
@@ -297,26 +310,79 @@ async function handleDynamicRoutes(
     routeInitInProgress = false
 
     // 9. 重新导航到目标路由
+    // console.log('[RouteGuard] 检查权限，目标路径:', to.path, '验证路径:', validatedPath, '有权限:', hasPermission)
+    // console.log('[RouteGuard] 用户角色:', userStore.info?.roles)
+    
     if (!hasPermission) {
       // 无权限访问，跳转到首页
       closeLoading()
 
       // 输出警告信息
       console.warn(`[RouteGuard] 用户无权限访问路径: ${to.path}，已跳转到首页`)
-
+      // console.log('[RouteGuard] 目标路径:', to.path)
+      // console.log('[RouteGuard] 验证后的路径:', validatedPath)
+      // console.log('[RouteGuard] 菜单列表长度:', menuList.length)
+      // console.log('[RouteGuard] 用户角色:', userStore.info?.roles)
+      
+      // 检查是否有可用的菜单路径作为首页
+      const availablePaths = RoutePermissionValidator.buildMenuPathSet(menuList)
+      // console.log('[RouteGuard] 可用的菜单路径:', Array.from(availablePaths))
+      
+      // 如果有可用路径，选择第一个作为默认首页
+      let finalPath = validatedPath
+      if (availablePaths.size > 0) {
+        finalPath = Array.from(availablePaths)[0]
+      }
+      
       // 直接跳转到首页
       next({
-        path: validatedPath,
+        path: finalPath,
         replace: true
       })
     } else {
-      // 有权限，正常导航
-      next({
-        path: to.path,
-        query: to.query,
-        hash: to.hash,
-        replace: true
-      })
+      // 有权限，但需要检查路由是否真实存在
+      // 有时候路由注册完成但路由表还没完全更新
+      // console.log('[RouteGuard] 用户有权限，准备导航到:', to.path)
+      
+      // 等待下一个事件循环，确保路由注册完成
+      await new Promise(resolve => setTimeout(resolve, 50))
+      
+      if (to.path === validatedPath && router.hasRoute(to.name || '')) {
+        // console.log('[RouteGuard] 路由存在，正常导航')
+        // 路由存在，正常导航
+        next({
+          path: to.path,
+          query: to.query,
+          hash: to.hash,
+          replace: true
+        })
+      } else {
+        // 路由可能还未完全注册完成，稍等后重试
+        // console.log('[RouteGuard] 路由可能未完全注册，稍等后重试')
+        // console.log('[RouteGuard] 当前所有已注册路由:', router.getRoutes().map(r => ({ path: r.path, name: r.name })))
+        
+        // 再次检查目标路由是否存在
+        if (router.hasRoute(to.name || '')) {
+          // console.log('[RouteGuard] 路由现在存在，直接导航')
+          next()
+        } else {
+          // 路由仍然不存在，跳转到首页
+          console.warn('[RouteGuard] 路由注册失败，跳转到首页')
+          // console.log('[RouteGuard] 检查所有已注册路由:', router.getRoutes().map(r => r.path))
+          
+          // 尝试找到一个可用的路径
+          const availablePaths = RoutePermissionValidator.buildMenuPathSet(menuList)
+          let fallbackPath = validatedPath
+          if (availablePaths.size > 0) {
+            fallbackPath = Array.from(availablePaths)[0]
+          }
+          
+          next({
+            path: fallbackPath,
+            replace: true
+          })
+        }
+      }
     }
   } catch (error) {
     console.error('[RouteGuard] 动态路由注册失败:', error)
@@ -351,10 +417,32 @@ async function handleDynamicRoutes(
  */
 async function fetchUserInfo(): Promise<void> {
   const userStore = useUserStore()
-  const data = await fetchGetUserInfo()
-  userStore.setUserInfo(data)
-  // 检查并清理工作台标签页（如果是不同用户登录）
-  userStore.checkAndClearWorktabs()
+  
+  try {
+    const data = await fetchGetUserInfo()
+    
+    // 根据后端返回格式处理用户信息 { code: 200, data: { user: {...} }, msg: '...' }
+    let userData = data
+    if (data.code === 200 && data.data && data.data.user) {
+      // 如果是 { code: 200, data: { user: {...} }} 格式
+      userData = data.data.user
+    } else if (data.code === 200 && data.data) {
+      // 如果用户信息直接在data中
+      userData = data.data
+    } else if (data.data && data.data.user) {
+      // 如果是 { data: { user: {...} }} 格式
+      userData = data.data.user
+    }
+    
+    userStore.setUserInfo(userData)
+    // 检查并清理工作台标签页（如果是不同用户登录）
+    userStore.checkAndClearWorktabs()
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    // 如果获取用户信息失败，可能是token无效，执行登出操作
+    AuthService.logout()
+    throw error
+  }
 }
 
 /**
@@ -383,13 +471,34 @@ function handleRootPathRedirect(to: RouteLocationNormalized, next: NavigationGua
     return false
   }
 
+  const userStore = useUserStore()
+  
+  // 如果用户未登录，重定向到登录页
+  if (!userStore.isLogin) {
+    next({ name: 'Login', replace: true })
+    return true
+  }
+
+  // 如果用户已登录，尝试获取首页路径
   const { homePath } = useCommon()
+  
+  // 等待动态路由注册完成
+  if (!routeRegistry?.isRegistered()) {
+    // console.log('[RouteGuard] 动态路由尚未注册完成，稍后重试')
+    // 不立即跳转，而是继续执行路由守卫流程
+    return false
+  }
+  
   if (homePath.value && homePath.value !== '/') {
+    // console.log('[RouteGuard] 重定向到用户首页:', homePath.value)
     next({ path: homePath.value, replace: true })
     return true
   }
 
-  return false
+  // 如果没有找到首页路径，默认跳转到仪表盘
+  // console.log('[RouteGuard] 默认重定向到仪表盘')
+  next({ path: '/dashboard', replace: true })
+  return true
 }
 
 /**

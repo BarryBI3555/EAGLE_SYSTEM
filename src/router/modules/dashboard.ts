@@ -27,7 +27,9 @@ export const dashboardRoutes: AppRouteRecord = {
       component: '/dashboard/hotmap',
       meta: {
         title: 'menus.dashboard.hotmap',
-        keepAlive: false
+        keepAlive: false,
+        fixedTab: true,
+        roles: ['R_SUPER', 'R_ADMIN']
       }
     },
   ]

@@ -1,4 +1,42 @@
-/**
+// 由于无法找到该文件，这里提供一个参考实现
+// 如果存在menu store，建议添加一个方法来手动刷新菜单
+
+/*
+// 示例实现：
+
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { MenuProcessor } from '@/router/core/MenuProcessor'
+import { useUserStore } from './user'
+import { AppRouteRecord } from '@/types/router'
+
+export const useMenuStore = defineStore('menu', () => {
+  const menuList = ref<AppRouteRecord[]>([])
+  
+  // 添加刷新菜单的方法
+  const refreshMenuByRoles = async () => {
+    const userStore = useUserStore()
+    const roles = userStore.info?.roles || []
+    
+    if (roles.length === 0) {
+      console.warn('用户没有角色，无法刷新菜单')
+      return
+    }
+    
+    const processor = new MenuProcessor()
+    const allMenus = await processor.getMenuList() // 获取所有菜单
+    const filteredMenus = processor.filterMenuByRoles(allMenus, roles) // 根据角色过滤
+    
+    menuList.value = filteredMenus
+    console.log('菜单已根据角色刷新', roles)
+  }
+  
+  return {
+    menuList,
+    refreshMenuByRoles
+  }
+})
+*//**
  * 菜单状态管理模块
  *
  * 提供菜单数据和动态路由的状态管理

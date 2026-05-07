@@ -60,14 +60,14 @@
               </p>
             </div>
 
-            <div class="flex-cb mt-2 text-sm">
+            <!-- <div class="flex-cb mt-2 text-sm">
               <ElCheckbox v-model="formData.rememberPassword">{{
                 $t('login.rememberPwd')
               }}</ElCheckbox>
               <RouterLink class="text-theme" :to="{ name: 'ForgetPassword' }">{{
                 $t('login.forgetPwd')
               }}</RouterLink>
-            </div>
+            </div> -->
 
             <div style="margin-top: 30px">
               <ElButton
@@ -81,12 +81,12 @@
               </ElButton>
             </div>
 
-            <div class="mt-5 text-sm text-gray-600">
+            <!-- <div class="mt-5 text-sm text-gray-600">
               <span>{{ $t('login.noAccount') }}</span>
               <RouterLink class="text-theme" :to="{ name: 'Register' }">{{
                 $t('login.register')
               }}</RouterLink>
-            </div>
+            </div> -->
           </ElForm>
         </div>
       </div>
@@ -99,9 +99,14 @@
   import { useUserStore } from '@/store/modules/user'
   import { useI18n } from 'vue-i18n'
   import { HttpError } from '@/utils/http/error'
-  import { fetchLogin } from '@/api/auth'
+  import { fetchLogin, fetchGetUserInfo } from '@/api/auth/index'
+  import { fetchGetMenuList } from '@/api/system-manage'
   import { ElNotification, type FormInstance, type FormRules } from 'element-plus'
   import { useSettingStore } from '@/store/modules/setting'
+  import { useMenuStore } from '@/store/modules/menu'
+  import { useCommon } from '@/hooks/core/useCommon'
+  import { AuthService } from '@/services/authService'
+import { LogService } from '@/services/logServices'
 
   defineOptions({ name: 'Login' })
 
@@ -139,13 +144,6 @@
 
   const loading = ref(false)
 
-  // 预设的固定账号密码
-  const FIXED_ACCOUNTS = {
-    'piccadmin': { password: 'piccadmin', role: 'admin', roles: ['R_ADMIN'] },
-    'piccuser': { password: 'piccuser', role: 'user', roles: ['R_USER'] },
-    'piccsuper': { password: 'piccsuper', role: 'super', roles: ['R_SUPER'] }
-  }
-
   // 登录
   const handleSubmit = async () => {
     if (!formRef.value) return
@@ -165,37 +163,68 @@
 
       const { username, password } = formData
 
-      // 检查是否为预设账号
-      const accountInfo = FIXED_ACCOUNTS[username]
-      if (!accountInfo || accountInfo.password !== password) {
-        ElMessage.error('用户名或密码错误')
+      // 调用后端API进行登录
+      const result = await AuthService.login(username, password)
+      
+      if (!result.success) {
+        ElMessage.error(result.message || '登录失败')
         return
       }
 
-      // 生成模拟token和用户信息
-      const token = generateMockToken(username, accountInfo.role)
-      const refreshToken = generateMockRefreshToken(username, accountInfo.role)
-
-      // 验证token
-      if (!token) {
-        throw new Error('Login failed - no token received')
+      // 登录成功后获取完整的用户信息
+      let userInfo: any;
+      try {
+        userInfo = await AuthService.getCurrentUser()
+        console.log('从后端获取的用户信息:', userInfo);
+        userStore.setUserInfo(userInfo)
+      } catch (error) {
+        console.error('从AuthService获取用户信息失败:', error)
+        // 如果通过AuthService获取失败，尝试通过API模块获取
+        try {
+          userInfo = await fetchGetUserInfo();
+          console.log('通过API模块获取的用户信息:', userInfo);
+          userStore.setUserInfo(userInfo)
+        } catch (apiError) {
+          console.error('通过API模块获取用户信息也失败:', apiError)
+          // 如果都失败，使用登录响应中的用户数据
+          if (result.data && result.data.user) {
+            userInfo = result.data.user;
+            console.log('使用登录响应中的用户信息:', userInfo);
+            userStore.setUserInfo(result.data.user)
+          } else {
+            console.error('无法获取用户信息，使用默认值');
+            userStore.setUserInfo({});
+          }
+        }
       }
-
-      // 存储 token 和登录状态
-      userStore.setToken(token, refreshToken)
-      userStore.setUserInfo({
-        username: username,
-        role: accountInfo.role,
-        roles: accountInfo.roles
-      })
+      
+      // 设置token到userStore
+      if (result.token) {
+        userStore.setToken(result.token)
+      }
+      
+      // 确保等待token设置完成后再进行下一步
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       userStore.setLoginStatus(true)
+
+      // 记录登录日志
+      await LogService.loginLog(username)
 
       // 登录成功处理
       showLoginSuccessNotice()
 
-      // 获取 redirect 参数，如果存在则跳转到指定页面，否则跳转到首页
+      // 获取 redirect 参数，如果存在则跳转到指定页面
       const redirect = route.query.redirect as string
-      router.push(redirect || '/')
+      
+      if (redirect) {
+        // 如果有重定向参数，直接跳转
+        router.push(redirect)
+      } else {
+        // 登录成功后，跳转到根路径，让路由守卫处理动态路由注册和后续跳转
+        // 这样可以确保在路由守卫中完成所有准备工作后再跳转到目标页面
+        router.push('/');
+      }
     } catch (error) {
       // 处理 HttpError
       if (error instanceof HttpError) {
@@ -211,21 +240,6 @@
     }
   }
 
-  // 生成模拟token
-  const generateMockToken = (username: string, role: string) => {
-    const payload = {
-      name: username,
-      role: role,
-      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24小时后过期
-    }
-    return `mock_token_${username}_${role}_${Date.now()}`
-  }
-
-  // 生成模拟刷新token
-  const generateMockRefreshToken = (username: string, role: string) => {
-    return `mock_refresh_token_${username}_${role}_${Date.now()}`
-  }
-
   // 重置拖拽验证
   const resetDragVerify = () => {
     dragVerify.value.reset()
@@ -234,12 +248,15 @@
   // 登录成功提示
   const showLoginSuccessNotice = () => {
     setTimeout(() => {
+      // 获取用户信息
+      const userInfo = userStore.getUserInfo
+      const username = userInfo.username || userInfo.usercode || '用户'
       ElNotification({
         title: t('login.success.title'),
         type: 'success',
         duration: 2500,
         zIndex: 10000,
-        message: `${t('login.success.message')}, ${systemName}!`
+        message: `${t('login.success.message')}, ${username}!`
       })
     }, 1000)
   }

@@ -293,7 +293,11 @@
     "datatable": {
       "title": "数据表格",
       "subtitle": "数据图表"
-    } 
+    },
+    "operationlog": {
+      "title": "日志",
+      "subtitle": "用户操作日志"
+    }
   },
   "table": {
     "form": {

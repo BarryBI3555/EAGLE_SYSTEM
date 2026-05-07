@@ -42,6 +42,7 @@ import { setPageTitle } from '@/utils/router'
 import { resetRouterState } from '@/router/guards/beforeEach'
 import { useMenuStore } from './menu'
 import { StorageConfig } from '@/utils/storage/storage-config'
+import { LogService } from '@/services/logServices'
 
 /**
  * 用户状态管理
@@ -79,7 +80,14 @@ export const useUserStore = defineStore(
      * @param newInfo 新的用户信息
      */
     const setUserInfo = (newInfo: Api.Auth.UserInfo) => {
-      info.value = newInfo
+      // console.log('[UserStore] 设置用户信息，角色:', newInfo.roles)
+      info.value = {
+        ...info.value,
+        ...newInfo,
+        // 确保角色信息被正确设置
+        roles: newInfo.roles || []
+      }
+      // console.log('[UserStore] 更新后的角色信息:', info.value.roles)
     }
 
     /**
@@ -140,8 +148,9 @@ export const useUserStore = defineStore(
      * 清空所有用户相关状态并跳转到登录页
      * 如果是同一账号重新登录，保留工作台标签页
      */
-    const logOut = () => {
+    const logOut = async () => {
       // 保存当前用户 ID，用于下次登录时判断是否为同一用户
+      await LogService.logoutLog(info.value.username || '')
       const currentUserId = info.value.userId
       if (currentUserId) {
         localStorage.setItem(StorageConfig.LAST_USER_ID_KEY, String(currentUserId))
