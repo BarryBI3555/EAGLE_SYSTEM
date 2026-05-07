@@ -415,15 +415,14 @@
         const response = await request.get({ url: 'api/cur_gzl/list', params: queryParams })
 
         // request.get 返回的已经是 res.data.data（后端返回的数据部分）
-        let tableResultData: DailyWorkloadRyData[] = []
+        let tableResultData: DailyWorkloadData[] = []
         
         if (Array.isArray(response)) {
           tableResultData = response
           
           if (!isInitialized.value && tableResultData.length) {
             allOriginData.value = [...tableResultData]
-            buildDeptOptions(allOriginData.value)
-            buildUserOptions(allOriginData.value)
+            buildDeptGroupMap(allOriginData.value)
             isInitialized.value = true
           }
 
@@ -504,10 +503,11 @@
       // await LogService.tableLog('人员当日工作量统计', '刷新', tableApiParams.value)
       
       const res = await request.get({ url: 'api/cur_gzl/list', params: { current: 1, size: 9999 } })
-      if (res?.code === 200 && res.data?.length) {
-        allOriginData.value = [...res.data]
+      // request.get 返回的已经是数据数组
+      if (Array.isArray(res) && res.length) {
+        allOriginData.value = [...res]
         buildDeptGroupMap(allOriginData.value)
-        currentMaxTjTime.value = res.data[0].maxTjTime || ''
+        currentMaxTjTime.value = res[0].maxTjTime || ''
       }
       refreshData()
     } catch {
