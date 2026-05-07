@@ -7,7 +7,7 @@ export const efficiencyRoutes: AppRouteRecord = {
   meta: {
     title: 'menus.efficiency.title',
     icon: 'ri:time-line',
-    roles: ['R_SUPER', 'R_ADMIN']
+    roles: ['R_SUPER', 'R_ADMIN', 'R_USER']
   },
   children: [
     // // 运营效率
@@ -27,6 +27,7 @@ export const efficiencyRoutes: AppRouteRecord = {
       meta: {
         title: 'menus.efficiency.daily.title',
         keepAlive: false
+
       },
       children: [
         // 周期通报
@@ -45,7 +46,8 @@ export const efficiencyRoutes: AppRouteRecord = {
               component: '/efficiency/daily/periodic/table_cur_gzl_bm',
               meta: {
                 title: '部门当日工作量统计',
-                keepAlive: false
+                keepAlive: false,
+                roles: ['R_ADMIN', 'R_SUPER']
               }
             },
             {
@@ -54,7 +56,8 @@ export const efficiencyRoutes: AppRouteRecord = {
               component: '/efficiency/daily/periodic/table_cur_gzl_group',
               meta: {
                 title: '小组当日工作量统计',
-                keepAlive: false
+                keepAlive: false,
+                roles: ['R_ADMIN', 'R_SUPER']
               }
             },
             // ====================================================================
@@ -64,7 +67,8 @@ export const efficiencyRoutes: AppRouteRecord = {
               component: '/efficiency/daily/periodic/table_cur_gzl_ry',
               meta: {
                 title: '人员当日工作量统计',
-                keepAlive: false
+                keepAlive: false,
+                roles: ['R_USER', 'R_ADMIN', 'R_SUPER']
               }
             },
             {
@@ -73,7 +77,8 @@ export const efficiencyRoutes: AppRouteRecord = {
               component: '/efficiency/daily/periodic/table_cur_gzl_rs',
               meta: {
                 title: '人伤当日工作量统计',
-                keepAlive: false
+                keepAlive: false,
+                roles: ['R_USER', 'R_ADMIN', 'R_SUPER']
               }
             }
           ]

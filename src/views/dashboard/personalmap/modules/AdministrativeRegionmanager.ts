@@ -1,4 +1,6 @@
 import { ref } from 'vue';
+import fetchWrapper from '@/utils/fetchWrapper';
+
 const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
 
 /**
@@ -107,23 +109,14 @@ toggleDistricts = (): void => {
         // 通过后端代理获取地理位置信息
         const geocoderUrl = `${VITE_API_PROXY_PORT_URL}api/map/geocoder?location=${center.lat},${center.lng}`;
         
-        const geocodeResponse = await fetch(geocoderUrl);
+        const geocodeData = await fetchWrapper.get(geocoderUrl);
         
-        // 检查响应状态和内容类型
-        if (!geocodeResponse.ok) {
-          console.error('获取地理位置信息失败:', geocodeResponse.status, geocodeResponse.statusText);
+        // 检查响应数据状态
+        if (!geocodeData || geocodeData.status !== 0) {
+          console.error('获取地理位置信息失败:', geocodeData?.status, geocodeData?.message);
           this.showingDistricts.value = false;
           return;
         }
-        
-        const contentType = geocodeResponse.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          console.error('API返回非JSON数据:', contentType, await geocodeResponse.text());
-          this.showingDistricts.value = false;
-          return;
-        }
-        
-        const geocodeData = await geocodeResponse.json();
         
         if (geocodeData.status === 0) {
           // 使用城市名称进行搜索
@@ -131,23 +124,14 @@ toggleDistricts = (): void => {
           let areaName =  addressComponent.city;
           
           const searchUrl = `${VITE_API_PROXY_PORT_URL}api/map/district/search?keyword=${encodeURIComponent(areaName)}`;
-          const searchResponse = await fetch(searchUrl);
+          const searchData = await fetchWrapper.get(searchUrl);
           
-          // 检查响应状态和内容类型
-          if (!searchResponse.ok) {
-            console.error('搜索行政区划失败:', searchResponse.status, searchResponse.statusText);
+          // 检查响应数据状态
+          if (!searchData || searchData.status !== 0) {
+            console.error('搜索行政区划失败:', searchData?.status, searchData?.message);
             this.showingDistricts.value = false;
             return;
           }
-          
-          const searchContentType = searchResponse.headers.get('content-type');
-          if (!searchContentType || !searchContentType.includes('application/json')) {
-            console.error('搜索API返回非JSON数据:', searchContentType, await searchResponse.text());
-            this.showingDistricts.value = false;
-            return;
-          }
-          
-          const searchData = await searchResponse.json();
           
           let adcode = null;
           if (searchData.status === 0 && searchData.result && Array.isArray(searchData.result)) {
@@ -180,36 +164,19 @@ toggleDistricts = (): void => {
           }
           
           // 通过后端代理获取下级行政区划
-          const childrenUrl = `${VITE_API_PROXY_PORT_URL}api/map/district/getchildren?id=${adcode}`;
-          const childrenResponse = await fetch(childrenUrl);
+        const childrenData = await fetchWrapper.get('api/map/district/getchildren', { id: adcode });
           
-          // 检查响应状态和内容类型
-          if (!childrenResponse.ok) {
-            console.error('获取下级行政区划数据失败:', childrenResponse.status, childrenResponse.statusText);
-            this.showingDistricts.value = false;
-            return;
-          }
-          
-          const childrenContentType = childrenResponse.headers.get('content-type');
-          if (!childrenContentType || !childrenContentType.includes('application/json')) {
-            console.error('获取子区划API返回非JSON数据:', childrenContentType, await childrenResponse.text());
-            this.showingDistricts.value = false;
-            return;
-          }
-          
-          const childrenData = await childrenResponse.json();
-          
-          if (childrenData.status === 0 && childrenData.result) {
+          if (childrenData && childrenData.status === 0 && childrenData.result) {
             districtsData = childrenData.result;
             // 将数据缓存起来
             this.setCachedDistricts(districtsData);
           } else {
-            console.error('获取下级行政区划数据失败:', childrenData.message);
+            console.error('获取下级行政区划数据失败:', childrenData?.message || '未知错误');
             this.showingDistricts.value = false;
             return;
           }
         } else {
-          console.error('获取地理位置信息失败:', geocodeData.message);
+          console.error('获取地理位置信息失败:', geocodeData?.message || '未知错误');
           this.showingDistricts.value = false;
           return;
         }

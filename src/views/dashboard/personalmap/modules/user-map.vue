@@ -194,6 +194,7 @@
   import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
   import { AdministrativeRegionManager } from './AdministrativeRegionmanager'
   import { MapLoader } from '@/utils/mapLoader'
+  import fetchWrapper from '@/utils/fetchWrapper'
   const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
   const mapLoader = MapLoader.getInstance()
   // 全局声明腾讯地图SDK和自定义属性，避免TS类型报错
@@ -272,42 +273,62 @@
   // ==================== 地图初始化 ====================
   const initMap = async () => {
     try {
+      console.log('开始初始化地图');
       loading.value = true;
     
-      // 使用MapLoader加载地图API
+      // 获取TMap实例 - 现在应该已经加载完成
+      console.log('获取TMap实例');
       const mapLoader = MapLoader.getInstance();
-      await mapLoader.loadMapApi();
-    
-      // 获取TMap实例
       const TMap = await mapLoader.getMapInstance();
+      console.log('TMap实例获取完成', TMap);
     
+      // 确保DOM已完全渲染后再初始化地图
+      console.log('等待DOM更新');
+      await nextTick();
+      
       // 初始化地图
+      console.log('查找地图容器');
       const container = document.getElementById('map-container');
       if (!container) {
+        console.error('地图容器不存在');
         throw new Error('地图容器不存在');
       }
+      console.log('地图容器找到，尺寸:', container.offsetWidth, 'x', container.offsetHeight);
 
-      map = new window.TMap.Map(container, {
-        center: new window.TMap.LatLng(30.6799, 104.0571),
+      // 确保容器有尺寸
+      if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+        console.warn('地图容器初始尺寸为0，尝试调整尺寸');
+        // 强制触发重排
+        container.style.display = 'none';
+        container.offsetHeight; // 触发重排
+        container.style.display = '';
+      }
+
+      console.log('开始创建地图实例');
+      map = new TMap.Map(container, {
+        center: new TMap.LatLng(30.6799, 104.0571),
         zoom: 12,
         minZoom: 8,
         maxZoom: 19,
         draggable: true,
         scrollwheel: true,
         mapStyleId: 'style1'
-      })
+      });
+      console.log('地图实例创建完成', map);
 
-      const zoomControl = map.getControl(window.TMap.constants.DEFAULT_CONTROL_ID.ZOOM)
-      const rotationControl = map.getControl(window.TMap.constants.DEFAULT_CONTROL_ID.ROTATION)
-      if (zoomControl) zoomControl.setPosition(window.TMap.constants.CONTROL_POSITION.TOP_LEFT)
+      const zoomControl = map.getControl(TMap.constants.DEFAULT_CONTROL_ID.ZOOM)
+      const rotationControl = map.getControl(TMap.constants.DEFAULT_CONTROL_ID.ROTATION)
+      if (zoomControl) zoomControl.setPosition(TMap.constants.CONTROL_POSITION.TOP_LEFT)
       if (rotationControl)
-        rotationControl.setPosition(window.TMap.constants.CONTROL_POSITION.TOP_LEFT)
+        rotationControl.setPosition(TMap.constants.CONTROL_POSITION.TOP_LEFT)
 
       // 初始化行政区划管理器
       administrativeRegionManager = new AdministrativeRegionManager(map)
 
-      await fetchLatestLocations()
-      await fetchGroupList()
+      // 在后台异步加载数据，不阻塞地图初始化
+      fetchLatestLocations().catch(err => console.error('加载位置数据失败:', err));
+      fetchGroupList().catch(err => console.error('加载分组列表失败:', err));
+      
       loading.value = false
     } catch (err: any) {
       console.error('地图初始化失败', err)
@@ -342,16 +363,11 @@
   // ==================== 获取片区列表 ====================
   const fetchGroupList = async () => {
     try {
-      let url = `${VITE_API_PROXY_PORT_URL}api/locations/groups`
-      if (selectedDate.value) url += `?date=${selectedDate.value}`
-      const res = await fetch(url)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const allGroups = await res.json()
-
-      const dataUrl = `${VITE_API_PROXY_PORT_URL}api/locations/latest${selectedDate.value ? `?date=${selectedDate.value}` : ''}`
-      const dataRes = await fetch(dataUrl)
-      if (!dataRes.ok) throw new Error(`HTTP ${dataRes.status}`)
-      const userData = await dataRes.json()
+      const params: Record<string, any> = {}
+      if (selectedDate.value) params.date = selectedDate.value
+      
+      const allGroups = await fetchWrapper.get<any[]>('/api/locations/groups', params)
+      const userData = await fetchWrapper.get<any[]>('/api/locations/latest', params)
 
       const groupsWithData = new Set(userData.map((user: any) => user.groupscode))
       const filteredGroups = (allGroups || []).filter((group: any) =>
@@ -371,17 +387,12 @@
   // ==================== 获取人员最新位置（支持日期+片区+关键词） ====================
   const fetchLatestLocations = async () => {
     try {
-      const params = new URLSearchParams()
-      if (selectedDate.value) params.append('date', selectedDate.value)
-      if (selectedGroupCode.value) params.append('groupscode', selectedGroupCode.value)
-      if (searchKeyword.value) params.append('keyword', searchKeyword.value)
+      const params: Record<string, any> = {}
+      if (selectedDate.value) params.date = selectedDate.value
+      if (selectedGroupCode.value) params.groupscode = selectedGroupCode.value
+      if (searchKeyword.value) params.keyword = searchKeyword.value
 
-      const query = params.toString() ? `?${params.toString()}` : ''
-      const url = `${VITE_API_PROXY_PORT_URL}api/locations/latest${query}`
-
-      const res = await fetch(url)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      const data = await fetchWrapper.get<any[]>('/api/locations/latest', params)
       clearOverlays()
 
       userList.value = data || []
@@ -501,11 +512,9 @@
       }
       clearOverlays()
 
-      let url = `${VITE_API_PROXY_PORT_URL}api/locations/user/${usercode}`
-      if (selectedDate.value) url += `?date=${selectedDate.value}`
-      const res = await fetch(url)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      const params: Record<string, any> = {};
+      if (selectedDate.value) params.date = selectedDate.value;
+      const data = await fetchWrapper.get(`/api/locations/user/${usercode}`, params)
 
       if (!data || data.length === 0) {
         error.value = '该用户当日无轨迹数据'
@@ -565,7 +574,6 @@
         ]
       })
 
-      const carIcon = `/src/assets/images/icon/car.png`
       carMarkerLayer = new window.TMap.MultiMarker({
         map,
         styles: {
@@ -575,7 +583,7 @@
             anchor: { x: 18, y: 18 },
             faceTo: 'map',
             rotate: 0,
-            src: carIcon
+            src: '/src/assets/images/icon/Car.png'  // 使用正确的大小写文件名
           })
         },
         geometries: [{ id: 'car', styleId: 'car', position: path[0] }]
@@ -739,14 +747,13 @@ const startPlayback = (path: any[]) => {
     currentTrackBounds = null
   }
 
-  // 生命周期
+  // 在组件创建时就开始加载地图API，而不是等到mounted
   onMounted(async() => {
     try {
-      await mapLoader.loadMapApi();
-      // 地图API加载完成，可以初始化地图
+      // 地图API应该已经在组件创建时加载完成，直接初始化地图
       initMap();
     } catch (error) {
-      console.error('地图加载失败:', error);
+      console.error('地图初始化失败:', error);
     }
   })
   onBeforeUnmount(() => {

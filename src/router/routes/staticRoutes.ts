@@ -11,7 +11,22 @@ import { AppRouteRecordRaw } from '@/utils/router'
  * 2、静态路由不管是否登录都可以访问
  */
 export const staticRoutes: AppRouteRecordRaw[] = [
+
   // 不需要登录就能访问的路由示例
+  // {
+  //   path: '/',
+  //   name: 'Home',
+  //   component: () => import('@views/auth/login/index.vue'),
+  //   props: {
+  //     data: {
+  //       title: '欢迎',
+  //       desc: '欢迎访问EAGLE SYSTEM，请先登录',
+  //       btnText: '去登录',
+  //       imgUrl: '/svg/404.svg'  // 可以替换为更适合的图片
+  //     }
+  //   },
+  //   meta: { title: '首页', isHideTab: true }
+  // },
   // {
   //   path: '/welcome',
   //   name: 'WelcomeStatic',

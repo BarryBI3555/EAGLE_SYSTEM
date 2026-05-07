@@ -79,7 +79,14 @@ export const useUserStore = defineStore(
      * @param newInfo 新的用户信息
      */
     const setUserInfo = (newInfo: Api.Auth.UserInfo) => {
-      info.value = newInfo
+      console.log('[UserStore] 设置用户信息，角色:', newInfo.roles)
+      info.value = {
+        ...info.value,
+        ...newInfo,
+        // 确保角色信息被正确设置
+        roles: newInfo.roles || []
+      }
+      console.log('[UserStore] 更新后的角色信息:', info.value.roles)
     }
 
     /**

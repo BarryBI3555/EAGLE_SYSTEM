@@ -145,7 +145,7 @@
   import { ElNotification } from 'element-plus'
   import { useTable } from '@/hooks/core/useTable'
   import * as XLSX from 'xlsx'
-  import axios from 'axios'
+  import fetchWrapper from '@/utils/fetchWrapper'
   const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
   // 组件名称（用于 devtools 调试）
   defineOptions({ name: 'DailyWorkloadTable' })
@@ -411,21 +411,19 @@
           userName: tableApiParams.value.userName ?? ''
         }
 
-        const response = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl/list`, {
-          params: queryParams
-        })
+        const response = await fetchWrapper.get('api/cur_gzl/list', queryParams)
 
         // 首次加载：构建部门/小组下拉
-        if (!isInitialized.value && response.data?.code === 200 && response.data.data?.length) {
-          allOriginData.value = [...response.data.data]
+        if (!isInitialized.value && response?.code === 200 && response.data?.length) {
+          allOriginData.value = [...response.data]
           buildDeptGroupMap(allOriginData.value)
           isInitialized.value = true
         }
 
         // 处理表格数据
         let tableResultData: DailyWorkloadData[] = []
-        if (response.data?.code === 200 && Array.isArray(response.data.data)) {
-          tableResultData = response.data.data
+        if (response?.code === 200 && Array.isArray(response.data)) {
+          tableResultData = response.data
 
           // 动态更新标题统计时间
           if (tableResultData.length) {
@@ -501,13 +499,11 @@
    */
   const handleRefresh = async () => {
     try {
-      const res = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl/list`, {
-        params: { current: 1, size: 9999 }
-      })
-      if (res.data?.code === 200 && res.data.data?.length) {
-        allOriginData.value = [...res.data.data]
+      const res = await fetchWrapper.get('api/cur_gzl/list', { current: 1, size: 9999 })
+      if (res?.code === 200 && res.data?.length) {
+        allOriginData.value = [...res.data]
         buildDeptGroupMap(allOriginData.value)
-        currentMaxTjTime.value = res.data.data[0].maxTjTime || ''
+        currentMaxTjTime.value = res.data[0].maxTjTime || ''
       }
       refreshData()
     } catch {
@@ -588,10 +584,8 @@
    */
   const handleExportAll = async () => {
     try {
-      const res = await axios.get(`${VITE_API_PROXY_PORT_URL}api/cur_gzl/list`, {
-        params: tableApiParams.value
-      })
-      const data = res.data?.data as DailyWorkloadData[]
+      const res = await fetchWrapper.get('api/cur_gzl/list', tableApiParams.value)
+      const data = res.data as DailyWorkloadData[]
       if (!data.length) {
         ElNotification({ title: '提示', message: '暂无数据可导出', type: 'warning' })
         return

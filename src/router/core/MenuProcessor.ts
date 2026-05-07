@@ -22,13 +22,20 @@ export class MenuProcessor {
   async getMenuList(): Promise<AppRouteRecord[]> {
     const { isFrontendMode } = useAppMode()
 
+    console.log('[MenuProcessor] 当前应用模式:', isFrontendMode.value ? '前端模式' : '后端模式')
+    
     let menuList: AppRouteRecord[]
     if (isFrontendMode.value) {
+      console.log('[MenuProcessor] 执行前端模式菜单处理')
       menuList = await this.processFrontendMenu()
     } else {
+      console.log('[MenuProcessor] 执行后端模式菜单处理')
       menuList = await this.processBackendMenu()
     }
 
+    console.log('[MenuProcessor] 处理后的菜单列表长度:', menuList.length)
+    console.log('[MenuProcessor] 处理后的菜单路径:', menuList.map(m => m.path))
+    
     // 在规范化路径之前，验证原始路径配置
     this.validateMenuPaths(menuList)
 
@@ -43,13 +50,20 @@ export class MenuProcessor {
     const userStore = useUserStore()
     const roles = userStore.info?.roles
 
+    console.log('[MenuProcessor] 前端模式处理菜单，用户角色:', roles, '角色类型:', typeof roles, '角色长度:', roles?.length)
+    console.log('[MenuProcessor] 完整用户信息:', userStore.info)
+    
     let menuList = [...asyncRoutes]
 
     // 根据角色过滤菜单
     if (roles && roles.length > 0) {
+      console.log('[MenuProcessor] 用户有角色，开始过滤菜单，角色列表:', roles)
       menuList = this.filterMenuByRoles(menuList, roles)
+    } else {
+      console.log('[MenuProcessor] 用户没有角色或角色为空，返回所有菜单')
     }
 
+    console.log('[MenuProcessor] 过滤后菜单数量:', menuList.length)
     return this.filterEmptyMenus(menuList)
   }
 
@@ -58,6 +72,16 @@ export class MenuProcessor {
    */
   private async processBackendMenu(): Promise<AppRouteRecord[]> {
     const list = await fetchGetMenuList()
+    
+    // 即使在后端模式下，也根据用户角色进行额外的前端过滤
+    const userStore = useUserStore()
+    const roles = userStore.info?.roles
+    
+    if (roles && roles.length > 0) {
+      console.log('[MenuProcessor] 后端模式下进行前端角色过滤，用户角色:', roles)
+      return this.filterEmptyMenus(this.filterMenuByRoles(list, roles))
+    }
+    
     return this.filterEmptyMenus(list)
   }
 
@@ -65,20 +89,83 @@ export class MenuProcessor {
    * 根据角色过滤菜单
    */
   private filterMenuByRoles(menu: AppRouteRecord[], roles: string[]): AppRouteRecord[] {
-    return menu.reduce((acc: AppRouteRecord[], item) => {
+    // 添加调试日志
+    console.log('[MenuProcessor] 开始过滤菜单，用户角色:', roles)
+    console.log('[MenuProcessor] 原始菜单数量:', menu.length)
+    
+    const filtered = menu.reduce((acc: AppRouteRecord[], item) => {
       const itemRoles = item.meta?.roles
-      const hasPermission = !itemRoles || itemRoles.some((role) => roles?.includes(role))
+      
+      console.log('[MenuProcessor] 检查菜单项:', item.name, '路径:', item.path, '所需角色:', itemRoles)
+      
+      // 检查是否需要进行权限验证
+      const hasPermission = this.checkPermission(itemRoles, roles)
 
       if (hasPermission) {
+        console.log('[MenuProcessor] 保留菜单项:', item.name)
         const filteredItem = { ...item }
-        if (filteredItem.children?.length) {
+        if (filteredItem.children && filteredItem.children.length > 0) {
           filteredItem.children = this.filterMenuByRoles(filteredItem.children, roles)
+          // 如果子菜单经过过滤后还有内容，则保留该项
+          if (filteredItem.children.length > 0) {
+            acc.push(filteredItem)
+          } else {
+            // 如果子菜单被过滤后为空，但该项目本身不需要特定角色，则仍可保留
+            if (!itemRoles || itemRoles.length === 0) {
+              // 创建不带children的副本，避免空children
+              const itemWithoutEmptyChildren = { ...filteredItem }
+              delete itemWithoutEmptyChildren.children
+              acc.push(itemWithoutEmptyChildren)
+            } else {
+              acc.push(filteredItem)
+            }
+          }
+        } else {
+          acc.push(filteredItem)
         }
-        acc.push(filteredItem)
+      } else {
+        console.log('[MenuProcessor] 过滤掉菜单项:', item.name, '所需角色:', itemRoles, '用户角色:', roles)
       }
 
       return acc
     }, [])
+    
+    console.log('[MenuProcessor] 过滤后菜单数量:', filtered.length)
+    console.log('[MenuProcessor] 过滤后菜单路径列表:', filtered.map(item => ({ name: item.name, path: item.path })))
+    return filtered
+  }
+
+  /**
+   * 检查用户是否有权限访问指定菜单项
+   * @param itemRoles 菜单项所需角色
+   * @param userRoles 用户拥有的角色
+   * @returns 是否有权限
+   */
+  private checkPermission(itemRoles: string[] | undefined, userRoles: string[]): boolean {
+    // 如果菜单项没有设置角色要求，或者用户没有角色，允许访问
+    if (!itemRoles || itemRoles.length === 0) {
+      console.log('[MenuProcessor] 菜单项无角色要求，允许访问')
+      return true
+    }
+    
+    // 如果用户没有任何角色，拒绝访问需要特定角色的菜单项
+    if (!userRoles || userRoles.length === 0) {
+      console.warn('[MenuProcessor] 用户没有分配任何角色')
+      return false
+    }
+    
+    console.log('[MenuProcessor] 检查权限:', { requiredRoles: itemRoles, userRoles })
+    
+    // 检查用户角色是否包含菜单项所需的任一角色
+    const hasPermission = itemRoles.some((role) => {
+      const roleExists = userRoles.includes(role);
+      console.log(`[MenuProcessor] 角色检查: 需要 '${role}', 用户拥有:`, userRoles, '结果:', roleExists);
+      return roleExists;
+    });
+    
+    console.log('[MenuProcessor] 权限检查结果:', { requiredRoles: itemRoles, userRoles, hasPermission })
+    
+    return hasPermission
   }
 
   /**

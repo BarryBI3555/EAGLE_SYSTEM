@@ -47,7 +47,7 @@
       } catch (error) {
         console.warn('预加载失败:', error);
       }
-    }, 2000); // 延迟2秒，让页面先渲染完成
+    }); 
   };
 
   onMounted(() => {
