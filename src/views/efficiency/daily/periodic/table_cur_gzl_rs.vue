@@ -112,7 +112,7 @@
   import { useTable } from '@/hooks/core/useTable'
   import * as XLSX from 'xlsx'
   import { LogService } from '@/services/logServices'
-  import request from '@/utils/http'
+  import { axiosRequestDailyWorkloadRs } from '@/api/AllRequestMethods/index'
   const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
   // 组件名称
   defineOptions({ name: 'DailyWorkloadRsTable' })
@@ -243,9 +243,9 @@
         }
 
         // 最终接口
-        const response = await request.get({ url: 'api/cur_gzl_rs/list', params: queryParams })
+        const response = await axiosRequestDailyWorkloadRs(queryParams)
 
-        // request.get 返回的已经是 res.data.data（后端返回的数据部分）
+        // axios 返回的已经是 res.data.data（后端返回的数据部分）
         let tableResultData: DailyWorkloadRsData[] = []
         
         if (Array.isArray(response)) {
@@ -318,7 +318,7 @@
       // 记录刷新日志
       // await LogService.tableLog('人伤当日工作量统计', '刷新', tableApiParams.value)
       
-      const res = await request.get({ url: 'api/cur_gzl_rs/list', params: { current: 1, size: 9999 } })
+      const res = await axiosRequestDailyWorkloadRs({ size: 9999 })
       if (res?.code === 200 && res.data?.length) {
         allOriginData.value = [...res.data]
         buildDeptOptions(allOriginData.value)
@@ -389,7 +389,7 @@
       // 记录导出日志
       await LogService.tableLog('人伤当日工作量统计', '导出全部', tableApiParams.value)
       
-      const res = await request.get({ url: 'api/cur_gzl_rs/list', params: tableApiParams.value })
+      const res = await axiosRequestDailyWorkloadRs(tableApiParams.value)
       const data = res.data as DailyWorkloadRsData[]
       if (!data.length) {
         ElNotification({ title: '提示', message: '暂无数据可导出', type: 'warning' })

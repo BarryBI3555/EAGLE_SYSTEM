@@ -192,9 +192,9 @@
 
 <script setup lang="ts">
   import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
-  import { AdministrativeRegionManager } from './AdministrativeRegionmanager'
-  import { MapLoader } from '@/utils/mapLoader'
-  import request from '@/utils/http'
+  import { AdministrativeRegionManager } from '../../../../api/AdministrativeRegionmanager/AdministrativeRegionmanager'
+  import { MapLoader } from '@/api/MapLoader/mapLoader'
+  import { axiosRequestLatestLocations, axiosRequestGroupList, axiosRequestUserTrajectory } from '@/api/AllRequestMethods/index'
   import { LogService } from '@/services/logServices'
   const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
   const mapLoader = MapLoader.getInstance()
@@ -370,8 +370,8 @@
       // 记录日期筛选日志
       await LogService.userMapLog('日期筛选', params)
       
-      const allGroups = await request.get({ url: '/api/locations/groups', params })
-      const userData = await request.get({ url: '/api/locations/latest', params })
+      const allGroups = await axiosRequestGroupList(params)
+      const userData = await axiosRequestLatestLocations(params)
 
       const groupsWithData = new Set(userData.map((user: any) => user.groupscode))
       const filteredGroups = (allGroups || []).filter((group: any) =>
@@ -399,7 +399,7 @@
       // 记录筛选日志
       await LogService.userMapLog('筛选人员', params)
 
-      const data = await request.get({ url: '/api/locations/latest', params })
+      const data = await axiosRequestLatestLocations(params)
       clearOverlays()
 
       userList.value = data || []
@@ -525,7 +525,7 @@
 
       const params: Record<string, any> = {};
       if (selectedDate.value) params.date = selectedDate.value;
-      const data = await request.get({ url: `/api/locations/user/${usercode}`, params })
+      const data = await axiosRequestUserTrajectory(usercode, params)
 
       if (!data || data.length === 0) {
         error.value = '该用户当日无轨迹数据'

@@ -137,7 +137,7 @@
   import { useTable } from '@/hooks/core/useTable'
   import * as XLSX from 'xlsx'
   import { LogService } from '@/services/logServices'
-  import request from '@/utils/http'
+  import { axiosRequestDailyWorkloadGroup } from '@/api/AllRequestMethods/index'
   const VITE_API_PROXY_PORT_URL = import.meta.env.VITE_API_PROXY_PORT_URL
 
   // 组件名称（用于 devtools 调试）
@@ -356,9 +356,9 @@
           groups: tableApiParams.value.groups ?? ''
         }
 
-        const response = await request.get({ url: 'api/cur_gzl_group/list', params: queryParams })
+        const response = await axiosRequestDailyWorkloadGroup(queryParams)
 
-        // request.get 返回的已经是 res.data.data（后端返回的数据部分）
+        // axios 返回的已经是 res.data.data（后端返回的数据部分）
         let tableResultData: DailyWorkloadGroupData[] = []
         
         if (Array.isArray(response)) {
@@ -439,7 +439,7 @@
       // // 记录刷新日志
       // await LogService.tableLog('小组当日工作量统计', '刷新', tableApiParams.value)
       
-      const res = await request.get({ url: 'api/cur_gzl_group/list', params: { current: 1, size: 9999 } })
+      const res = await axiosRequestDailyWorkloadGroup({ current: 1, size: 9999 })
       if (res?.code === 200 && res.data?.length) {
         allOriginData.value = [...res.data]
         buildDeptGroupMap(allOriginData.value)
@@ -519,7 +519,7 @@
       // 记录导出日志
       await LogService.tableLog('小组当日工作量统计', '导出全部', tableApiParams.value)
       
-      const res = await request.get({ url: 'api/cur_gzl_group/list', params: tableApiParams.value })
+      const res = await axiosRequestDailyWorkloadGroup(tableApiParams.value)
       const data = res.data as DailyWorkloadGroupData[]
       if (!data.length) {
         ElNotification({ title: '提示', message: '暂无数据可导出', type: 'warning' })

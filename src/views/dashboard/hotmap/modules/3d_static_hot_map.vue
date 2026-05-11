@@ -59,10 +59,10 @@
 
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from 'vue'
-import { AdministrativeRegionManager } from '../../personalmap/modules/AdministrativeRegionmanager'
-import { MapLoader } from '@/utils/mapLoader'
+import { AdministrativeRegionManager } from '../../../../api/AdministrativeRegionmanager/AdministrativeRegionmanager'
+import { MapLoader } from '@/api/MapLoader/mapLoader'
 import { ElRow, ElCol } from 'element-plus'
-import request from '@/utils/http'
+import { axiosRequestStatsCardsData, axiosRequestHeatMapData } from '@/api/AllRequestMethods/index'
 import LogService from '@/services/logServices'
 
 
@@ -127,7 +127,7 @@ const fetchStatsCardsData = async () => {
 
     // console.log('请求统计数据URL:', `${VITE_API_PROXY_PORT_URL}api/statsCardsData`, params)  // 调试信息
 
-    const data = await request.get({ url: 'api/statsCardsData', params })
+    const data = await axiosRequestStatsCardsData(params)
     // console.log('后端返回数据:', data)  // 调试信息
 
     // 更新统计卡片数据
@@ -176,7 +176,7 @@ const fetchHeatMap = async () => {
   try {
     const params = selectedDate.value ? { date: selectedDate.value } : {}
     
-    const data = await request.get({ url: 'api/hotmap', params })
+    const data = await axiosRequestHeatMapData(params)
     // 记录筛选日志
     await LogService.hotmapLog('筛选并查看', params)
 
@@ -279,8 +279,7 @@ const initHeatMap = () => {
     },
 
   }).addTo(map)
-  console.log(window.heatData)
-  heat.setData(window.heatData)
+  // 注意：数据将在 fetchHeatMap() 中设置，此处不设置数据
 }
 
 // ==================== 生命周期 ====================
