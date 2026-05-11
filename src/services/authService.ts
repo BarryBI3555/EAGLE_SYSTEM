@@ -44,15 +44,15 @@ export class AuthService {
           // 如果无法解析为JSON，使用原始文本
           errorMessage = errorData || errorMessage;
         }
-        console.log('登录失败，响应数据:', errorMessage);
+        // console.log('登录失败，响应数据:', errorMessage);
         return { success: false, message: errorMessage };
       }
 
       const data = await response.json()
       
       // 调试日志
-      console.log('登录响应数据:', data)
-      console.log('响应状态:', response.status)
+      // console.log('登录响应数据:', data)
+      // console.log('响应状态:', response.status)
       
       if (response.ok) {
         // 保存token到localStorage
@@ -72,7 +72,7 @@ export class AuthService {
           }
         } else {
           // 如果没有找到期望的结构，返回错误
-          console.log('登录响应格式不符合预期，响应数据:', data);
+          // console.log('登录响应格式不符合预期，响应数据:', data);
           return { 
             success: false, 
             message: data.msg || data.message || '登录响应格式错误' 
@@ -117,15 +117,15 @@ export class AuthService {
           // 如果无法解析为JSON，使用原始文本
           errorMessage = errorData || errorMessage;
         }
-        console.log('注册失败，响应数据:', errorData);
+        // console.log('注册失败，响应数据:', errorData);
         return { success: false, message: errorMessage };
       }
 
       const data = await response.json()
       
       // 调试日志
-      console.log('注册响应数据:', data)
-      console.log('注册响应状态:', response.status)
+      // console.log('注册响应数据:', data)
+      // console.log('注册响应状态:', response.status)
       
       return { success: true, message: data.message || data.msg || '注册成功' };
     } catch (error) {
@@ -179,8 +179,8 @@ export class AuthService {
       const data = await response.json()
       
       // 调试日志
-      console.log('获取用户信息响应数据:', data)
-      console.log('获取用户信息响应状态:', response.status)
+      // console.log('获取用户信息响应数据:', data)
+      // console.log('获取用户信息响应状态:', response.status)
       
       // 后端返回的是标准结构 { code: 200, data: {...}, msg: '...' }
       if (data.code === 200 && data.data) {
