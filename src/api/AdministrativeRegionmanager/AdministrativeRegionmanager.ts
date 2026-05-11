@@ -114,7 +114,7 @@ toggleDistricts = async (): Promise<void> => {
         const center = this.map.getCenter();
         
         // 通过后端代理获取地理位置信息
-        const geocoderUrl = `${VITE_API_PROXY_PORT_URL}api/map/geocoder?location=${center.lat},${center.lng}`;
+        const geocoderUrl = `api/map/geocoder?location=${center.lat},${center.lng}`;
         
         const geocodeData = await request.get({ url: geocoderUrl });
         
@@ -130,7 +130,7 @@ toggleDistricts = async (): Promise<void> => {
           const addressComponent = geocodeData.result.address_component;
           let areaName =  addressComponent.city;
           
-          const searchUrl = `${VITE_API_PROXY_PORT_URL}api/map/district/search?keyword=${encodeURIComponent(areaName)}`;
+          const searchUrl = `api/map/district/search?keyword=${encodeURIComponent(areaName)}`;
           const searchData = await request.get({ url: searchUrl });
           
           // 检查响应数据状态

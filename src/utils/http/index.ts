@@ -63,11 +63,20 @@ const axiosInstance = axios.create({
 /** 请求拦截器 */
 axiosInstance.interceptors.request.use(
   (request: InternalAxiosRequestConfig) => {
-    // 从 localStorage 获取 token
-    const token = localStorage.getItem('access_token')
-    if (token) {
-      // 根据后端要求，使用Bearer token格式
-      request.headers.set('Authorization', `Bearer ${token}`)
+    const url = request.url || ''
+    
+    // 如果是完整URL（以http://或https://开头），不添加Authorization头（可能是外部API）
+    // 并且设置baseURL为空以避免拼接
+    const isFullUrl = url.startsWith('http://') || url.startsWith('https://')
+    if (isFullUrl) {
+      request.baseURL = ''
+    } else {
+      // 从 localStorage 获取 token
+      const token = localStorage.getItem('access_token')
+      if (token) {
+        // 根据后端要求，使用Bearer token格式
+        request.headers.set('Authorization', `Bearer ${token}`)
+      }
     }
 
     if (request.data && !(request.data instanceof FormData) && !request.headers['Content-Type']) {
@@ -93,10 +102,17 @@ axiosInstance.interceptors.response.use(
       return response
     }
     
-    const { code, msg } = data
-    if (code === ApiStatus.success) return response
-    if (code === ApiStatus.unauthorized) handleUnauthorizedError(msg)
-    throw createHttpError(msg || $t('httpMsg.requestFailed'), code)
+    // 处理标准格式 { code, msg, data }
+    if ('code' in data) {
+      const { code, msg } = data
+      if (code === ApiStatus.success) return response
+      if (code === ApiStatus.unauthorized) handleUnauthorizedError(msg)
+      throw createHttpError(msg || $t('httpMsg.requestFailed'), code)
+    }
+    
+    // 处理其他格式（如腾讯地图API的 { status, result } 格式）
+    // 对于没有code字段的响应，直接返回
+    return response
   },
   (error) => {
     if (error.response?.status === ApiStatus.unauthorized) handleUnauthorizedError()
@@ -197,8 +213,20 @@ async function request<T = any>(config: ExtendedAxiosRequestConfig): Promise<T> 
       return res.data as T
     }
     
-    // 否则返回 data 字段
-    return res.data.data as T
+    // 处理标准格式 { code, msg, data }
+    const responseData = res.data
+    if ('code' in responseData && 'data' in responseData) {
+      // 如果 data 是对象且包含 list 字段，返回 list（分页格式）
+      if (responseData.data && typeof responseData.data === 'object' && 'list' in responseData.data) {
+        return responseData.data.list as T
+      }
+      // 否则返回 data 字段
+      return responseData.data as T
+    }
+    
+    // 处理其他格式（如腾讯地图API的 { status, result } 格式）
+    // 直接返回整个响应数据
+    return responseData as T
   } catch (error) {
     if (error instanceof HttpError && error.code !== ApiStatus.unauthorized) {
       const showMsg = config.showErrorMessage !== false
