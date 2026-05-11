@@ -216,9 +216,10 @@ async function request<T = any>(config: ExtendedAxiosRequestConfig): Promise<T> 
     // 处理标准格式 { code, msg, data }
     const responseData = res.data
     if ('code' in responseData && 'data' in responseData) {
-      // 如果 data 是对象且包含 list 字段，返回 list（分页格式）
-      if (responseData.data && typeof responseData.data === 'object' && 'list' in responseData.data) {
-        return responseData.data.list as T
+      // 如果 data 是对象且包含 list 字段（分页格式），返回整个 data 对象
+      // 这样可以保留分页信息（total, page, pageSize）
+      if (responseData.data && typeof responseData.data === 'object') {
+        return responseData.data as T
       }
       // 否则返回 data 字段
       return responseData.data as T
