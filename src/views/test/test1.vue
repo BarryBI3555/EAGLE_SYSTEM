@@ -336,15 +336,15 @@
   }
 
   const handleRowClick = (row: PeriodicReportData) => {
-    console.log('Row clicked:', row)
+    // console.log('Row clicked:', row)
   }
 
   const handleHeaderClick = (column: any) => {
-    console.log('Header clicked:', column)
+    // console.log('Header clicked:', column)
   }
 
   const handleSortChange = (sortInfo: any) => {
-    console.log('Sort changed:', sortInfo)
+    // console.log('Sort changed:', sortInfo)
   }
 
   const handleRefresh = () => {
@@ -353,7 +353,7 @@
 
   const handleSearch = async () => {
     await searchBarRef.value.validate()
-    console.log('搜索参数:', searchFormState.value)
+    // console.log('搜索参数:', searchFormState.value)
     refreshData()
   }
 

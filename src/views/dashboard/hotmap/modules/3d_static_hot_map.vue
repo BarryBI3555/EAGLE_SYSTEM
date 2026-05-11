@@ -186,7 +186,7 @@ const fetchHeatMap = async () => {
     // 更新热力图数据
     if (heat) {
       heat.setData(window.heatData)
-      console.log(window.heatData)
+      // console.log(window.heatData)
     }
 
     // 同时获取统计卡片数据

@@ -175,21 +175,21 @@ import { LogService } from '@/services/logServices'
       let userInfo: any;
       try {
         userInfo = await AuthService.getCurrentUser()
-        console.log('从后端获取的用户信息:', userInfo);
+        // console.log('从后端获取的用户信息:', userInfo);
         userStore.setUserInfo(userInfo)
       } catch (error) {
         console.error('从AuthService获取用户信息失败:', error)
         // 如果通过AuthService获取失败，尝试通过API模块获取
         try {
           userInfo = await fetchGetUserInfo();
-          console.log('通过API模块获取的用户信息:', userInfo);
+          // console.log('通过API模块获取的用户信息:', userInfo);
           userStore.setUserInfo(userInfo)
         } catch (apiError) {
           console.error('通过API模块获取用户信息也失败:', apiError)
           // 如果都失败，使用登录响应中的用户数据
           if (result.data && result.data.user) {
             userInfo = result.data.user;
-            console.log('使用登录响应中的用户信息:', userInfo);
+            // console.log('使用登录响应中的用户信息:', userInfo);
             userStore.setUserInfo(result.data.user)
           } else {
             console.error('无法获取用户信息，使用默认值');

@@ -24,7 +24,7 @@ export const GlobalAutoRefresh = {
       }
       
       refreshTimer = window.setInterval(() => {
-        console.log(`全局自动刷新: 每${interval}分钟刷新一次`)
+        // console.log(`全局自动刷新: 每${interval}分钟刷新一次`)
         location.reload()
       }, AUTO_REFRESH_INTERVAL)
     }
