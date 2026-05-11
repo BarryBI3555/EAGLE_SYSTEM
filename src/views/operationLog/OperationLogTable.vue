@@ -118,6 +118,7 @@
   import { useTable } from '@/hooks/core/useTable'
   import * as XLSX from 'xlsx'
   import request from '@/utils/http'
+  import { axiosRequestQueryOperationLogs } from '@/api/AllRequestMethods'
   import { LogService } from '@/services/logServices'
 
   defineOptions({ name: 'OperationLogTable' })
@@ -233,10 +234,7 @@
           endTime: tableApiParams.value.endTime || ''
         }
 
-        const response = await request.get<{ list: OperationLogData[], total: number, page: number, pageSize: number }>({ 
-          url: 'api/log/query', 
-          params: queryParams 
-        })
+        const response = await axiosRequestQueryOperationLogs(queryParams)
         
         // request.get 已经提取了 data 字段
         // 后端返回格式: { list: [...], total: number, page: number, pageSize: number }
@@ -393,11 +391,8 @@
         endTime: tableApiParams.value.endTime || ''
       }
 
-      const response = await request.get<{ list: OperationLogData[], total: number }>({ 
-        url: 'api/log/query', 
-        params: queryParams 
-      })
-
+      const response = await axiosRequestQueryOperationLogs(queryParams)
+      
       const data = response?.list || []
       if (!data.length) {
         ElNotification({ title: '提示', message: '暂无数据可导出', type: 'warning' })

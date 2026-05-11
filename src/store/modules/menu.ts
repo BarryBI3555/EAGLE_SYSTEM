@@ -28,7 +28,7 @@ export const useMenuStore = defineStore('menu', () => {
     const filteredMenus = processor.filterMenuByRoles(allMenus, roles) // 根据角色过滤
     
     menuList.value = filteredMenus
-    console.log('菜单已根据角色刷新', roles)
+    // console.log('菜单已根据角色刷新', roles)
   }
   
   return {

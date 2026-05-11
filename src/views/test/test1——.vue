@@ -349,15 +349,15 @@
   }
 
   const handleRowClick = (row: ClaimsCycleData) => {
-    console.log('Row clicked:', row)
+    // console.log('Row clicked:', row)
   }
 
   const handleHeaderClick = (column: any) => {
-    console.log('Header clicked:', column)
+    // console.log('Header clicked:', column)
   }
 
   const handleSortChange = (sortInfo: any) => {
-    console.log('Sort changed:', sortInfo)
+    // console.log('Sort changed:', sortInfo)
   }
 
   const handleSizeChange = (size: number) => {
@@ -376,7 +376,7 @@
 
   const handleSearch = async () => {
     await searchBarRef.value.validate()
-    console.log('搜索参数:', searchFormState.value)
+    // console.log('搜索参数:', searchFormState.value)
     // 更新API参数并重新获取数据
     refreshData()
   }
