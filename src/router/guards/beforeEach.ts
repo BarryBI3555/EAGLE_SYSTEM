@@ -117,7 +117,18 @@ export function setupBeforeEachGuard(router: Router): void {
       } catch (error) {
         console.error('[RouteGuard] 路由守卫处理失败:', error)
         closeLoading()
-        next({ name: 'Exception500' })
+        // 检查是否是网络连接错误（后端未启动）
+        const isNetworkError = error.message?.includes('Network Error') || 
+                               error.message?.includes('ECONNREFUSED') ||
+                               error.message?.includes('ERR_CONNECTION_REFUSED') ||
+                               error.message?.includes('Failed to fetch')
+        
+        if (isNetworkError) {
+          // 后端未启动，重定向到登录页而不是500页
+          next({ name: 'Login', replace: true })
+        } else {
+          next({ name: 'Exception500' })
+        }
       }
     }
   )
@@ -159,6 +170,12 @@ async function handleRouteGuard(
 
   // 2. 检查路由初始化是否已失败（防止死循环）
   if (routeInitFailed) {
+    // 如果访问登录页面，重置失败标记，允许重新登录
+    if (to.path === RoutesAlias.Login) {
+      routeInitFailed = false
+      next()
+      return
+    }
     // 已经失败过，直接放行到错误页面，不再重试
     if (to.matched.length > 0) {
       next()
@@ -390,11 +407,29 @@ async function handleDynamicRoutes(
     // 关闭 loading
     closeLoading()
 
-    // 401 错误：axios 拦截器已处理退出登录，取消当前导航
+    // 401 错误：token 无效，清除登录状态并重定向到登录页
     if (isUnauthorizedError(error)) {
       // 重置状态，允许重新登录后再次初始化
       routeInitInProgress = false
-      next(false)
+      routeInitFailed = false
+      // 清除用户状态
+      AuthService.logout()
+      next({ name: 'Login', replace: true })
+      return
+    }
+
+    // 检查是否是网络错误（后端未启动）
+    const isNetworkError = error.message?.includes('Network Error') || 
+                           error.message?.includes('ECONNREFUSED') ||
+                           error.message?.includes('ERR_CONNECTION_REFUSED') ||
+                           error.message?.includes('Failed to fetch')
+    
+    if (isNetworkError) {
+      // 网络错误：后端可能未启动，不标记失败，允许重试
+      routeInitInProgress = false
+      routeInitFailed = false // 重要：不清除失败标记会导致无法重试
+      // 跳转到登录页，让用户等待后端启动后重新登录
+      next({ name: 'Login', replace: true })
       return
     }
 
@@ -439,9 +474,20 @@ async function fetchUserInfo(): Promise<void> {
     userStore.checkAndClearWorktabs()
   } catch (error) {
     console.error('获取用户信息失败:', error)
-    // 如果获取用户信息失败，可能是token无效，执行登出操作
-    AuthService.logout()
-    throw error
+    // 检查是否是网络错误（后端未启动）
+    const isNetworkError = error.message?.includes('Network Error') || 
+                           error.message?.includes('ECONNREFUSED') ||
+                           error.message?.includes('ERR_CONNECTION_REFUSED') ||
+                           error.message?.includes('Failed to fetch')
+    
+    if (isNetworkError) {
+      // 如果是网络错误，不要登出用户，只是让其重试
+      throw error
+    } else {
+      // 如果获取用户信息失败，可能是token无效，执行登出操作
+      AuthService.logout()
+      throw error
+    }
   }
 }
 
