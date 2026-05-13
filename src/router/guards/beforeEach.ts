@@ -433,12 +433,6 @@ async function handleDynamicRoutes(
       return
     }
 
-    // 检查是否是网络连接错误（后端未启动）
-    const isNetworkError = error.message?.includes('Network Error') || 
-                           error.message?.includes('ECONNREFUSED') ||
-                           error.message?.includes('ERR_CONNECTION_REFUSED') ||
-                           error.message?.includes('Failed to fetch')
-    
     if (isNetworkError) {
       // 网络错误：后端可能未启动，不标记失败，允许重试
       routeInitInProgress = false
