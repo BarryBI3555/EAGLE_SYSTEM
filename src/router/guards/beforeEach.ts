@@ -433,17 +433,31 @@ async function handleDynamicRoutes(
       return
     }
 
-    // 标记初始化失败，防止死循环
-    routeInitFailed = true
-    routeInitInProgress = false
-
-    // 输出详细错误信息，便于排查
-    if (isHttpError(error)) {
-      console.error(`[RouteGuard] 错误码: ${error.code}, 消息: ${error.message}`)
+    // 检查是否是网络连接错误（后端未启动）
+    const isNetworkError = error.message?.includes('Network Error') || 
+                           error.message?.includes('ECONNREFUSED') ||
+                           error.message?.includes('ERR_CONNECTION_REFUSED') ||
+                           error.message?.includes('Failed to fetch')
+    
+    if (isNetworkError) {
+      // 网络错误：后端可能未启动，不标记失败，允许重试
+      routeInitInProgress = false
+      routeInitFailed = false // 不标记失败，允许重试
+      // 跳转到登录页，让用户等待后端启动后重新登录
+      next({ name: 'Login', replace: true })
+    } else {
+      // 标记初始化失败，防止死循环（仅对于非网络错误）
+      routeInitFailed = true
+      routeInitInProgress = false
+      
+      // 输出详细错误信息，便于排查
+      if (isHttpError(error)) {
+        console.error(`[RouteGuard] 错误码: ${error.code}, 消息: ${error.message}`)
+      }
+      
+      // 跳转到 500 页面，使用 replace 避免产生历史记录
+      next({ name: 'Exception500', replace: true })
     }
-
-    // 跳转到 500 页面，使用 replace 避免产生历史记录
-    next({ name: 'Exception500', replace: true })
   }
 }
 
@@ -474,6 +488,7 @@ async function fetchUserInfo(): Promise<void> {
     userStore.checkAndClearWorktabs()
   } catch (error) {
     console.error('获取用户信息失败:', error)
+    
     // 检查是否是网络错误（后端未启动）
     const isNetworkError = error.message?.includes('Network Error') || 
                            error.message?.includes('ECONNREFUSED') ||
@@ -481,7 +496,7 @@ async function fetchUserInfo(): Promise<void> {
                            error.message?.includes('Failed to fetch')
     
     if (isNetworkError) {
-      // 如果是网络错误，不要登出用户，只是让其重试
+      // 如果是网络错误，不要登出用户，只是抛出错误让上级处理
       throw error
     } else {
       // 如果获取用户信息失败，可能是token无效，执行登出操作
