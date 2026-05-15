@@ -99,7 +99,7 @@
                     >({{ user.usercode }})</span
                   >
                 </span>
-                <span class="user-time">{{ formatTime(user.createTime) }}</span>
+                <span class="user-time">{{ formatTime(user.reportTime) }}</span>
               </div>
               <div class="user-card-body">
                 <div class="user-location">
@@ -155,7 +155,7 @@
               class="path-item"
               @click="showPointOnMap(item)"
             >
-              <div class="path-time">{{ formatTime(item.createTime) }}</div>
+              <div class="path-time">{{ formatTime(item.reportTime) }}</div>
               <div class="path-coord">{{ item.address || '解析中...' }}</div>
             </div>
             <div v-if="trackLoading" class="no-path">
@@ -535,10 +535,10 @@
       }
 
       const sorted = [...data].sort(
-        (a, b) => new Date(a.createTime).getTime() - new Date(b.createTime).getTime()
+        (a, b) => new Date(a.reportTime).getTime() - new Date(b.reportTime).getTime()
       )
       currentUserPathList.value = [...data].sort(
-        (a, b) => new Date(b.createTime).getTime() - new Date(a.createTime).getTime()
+        (a, b) => new Date(b.reportTime).getTime() - new Date(a.reportTime).getTime()
       )
 
       const path = sorted.map((p) => new window.TMap.LatLng(p.latitude, p.longitude))
@@ -717,7 +717,7 @@ const startPlayback = (path: any[]) => {
       <span style="font-weight:bold;font-size:14px;">📍 轨迹点详情</span>
       <span id="${closeBtnId}" style="cursor:pointer;font-size:18px;color:#9ca3af;">&times;</span>
     </div>
-    <div>🕒 时间：${formatTime(point.createTime)}</div>
+    <div>🕒 时间：${formatTime(point.reportTime)}</div>
     <div style="margin:6px 0;">🏠 地址：${point.address || '解析中...'}</div>
     <div>📍 坐标：${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}</div>
   </div>`
