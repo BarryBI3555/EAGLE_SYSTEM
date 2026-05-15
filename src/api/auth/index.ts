@@ -39,8 +39,9 @@ export async function fetchGetUserInfo(): Promise<Api.Auth.UserInfo> {
     //   message: error.message
     // })
     
-    // 如果请求失败且状态码为401或403，执行登出操作
-    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+    // 如果请求失败且状态码为401（未授权），执行登出操作
+    // 但如果是403（禁止访问）且不是因为认证问题，则不登出用户（可能是因为后端未启动）
+    if (error.response && error.response.status === 401) {
       // console.log('检测到认证错误，执行登出操作')
       AuthService.logout()
     }

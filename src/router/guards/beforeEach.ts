@@ -489,11 +489,18 @@ async function fetchUserInfo(): Promise<void> {
                            error.message?.includes('ERR_CONNECTION_REFUSED') ||
                            error.message?.includes('Failed to fetch')
     
-    if (isNetworkError) {
-      // 如果是网络错误，不要登出用户，只是抛出错误让上级处理
+    // 检查是否是HTTP 403错误 which might indicate backend is not running
+    const isBackendDown = error.response?.status === 403 || error.response?.status === 404 || error.response?.status === 0
+    
+    if (isNetworkError || isBackendDown) {
+      // 如果是网络错误或后端不可达，不要登出用户，只是抛出错误让上级处理
+      throw error
+    } else if (error.response?.status === 401) {
+      // 如果是401未授权错误，执行登出操作
+      AuthService.logout()
       throw error
     } else {
-      // 如果获取用户信息失败，可能是token无效，执行登出操作
+      // 其他错误情况，也执行登出操作
       AuthService.logout()
       throw error
     }
